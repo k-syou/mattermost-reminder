@@ -7,6 +7,6 @@ httpx==0.26.0
 pydantic==2.5.3
 python-multipart==0.0.6
 pytz==2024.1
-mangum==0.17.0
+a2wsgi==1.10.8
 pytest==7.4.4
 pytest-asyncio==0.23.3

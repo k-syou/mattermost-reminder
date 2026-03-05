@@ -7,11 +7,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from firebase_admin import credentials, initialize_app, firestore
 from dotenv import load_dotenv
 from firebase_functions import https_fn, scheduler_fn
-from mangum import Mangum
 from datetime import datetime
-import asyncio
 import httpx
 import pytz
+from a2wsgi import ASGIMiddleware
 
 load_dotenv()
 
@@ -114,10 +113,20 @@ async def health():
 
 
 # Firebase Functions - must be defined in main.py for discovery
-from mangum import Mangum
+_wsgi_app = ASGIMiddleware(app)
 
-# Create ASGI adapter for FastAPI
-handler = Mangum(app, lifespan="off")
+
+def _cors_headers(req: https_fn.Request) -> dict:
+    origin = req.headers.get("Origin")
+    request_headers = req.headers.get("Access-Control-Request-Headers")
+    return {
+        # If credentials are used, Access-Control-Allow-Origin cannot be "*"
+        "Access-Control-Allow-Origin": origin or "*",
+        "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS",
+        "Access-Control-Allow-Headers": request_headers or "Authorization,Content-Type",
+        "Access-Control-Allow-Credentials": "true",
+        "Vary": "Origin",
+    }
 
 
 @https_fn.on_request()
@@ -125,41 +134,34 @@ def api(req: https_fn.Request) -> https_fn.Response:
     """
     Firebase HTTP Function that wraps the FastAPI application
     """
-    # Convert Firebase Request to ASGI format
-    scope = {
-        "type": "http",
-        "method": req.method,
-        "path": req.path,
-        "query_string": req.query_string.encode() if req.query_string else b"",
-        "headers": [[k.encode(), v.encode()] for k, v in req.headers.items()],
-        "server": (req.host, 443),
-        "client": (req.remote_addr, 0),
-        "scheme": "https",
-    }
-    
-    # Create a simple receive function
-    async def receive():
-        return {
-            "type": "http.request",
-            "body": req.get_data() if hasattr(req, 'get_data') else b"",
-        }
-    
-    # Run the ASGI handler
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
+    # Handle CORS preflight early
+    if req.method == "OPTIONS":
+        return https_fn.Response("", status=204, headers=_cors_headers(req))
+
+    status_line = "500 INTERNAL SERVER ERROR"
+    response_headers = []
+
+    def start_response(status, headers, exc_info=None):
+        nonlocal status_line, response_headers
+        status_line = status
+        response_headers = headers
+
+    result_iter = _wsgi_app(req.environ, start_response)
     try:
-        response = loop.run_until_complete(handler(scope, receive, None))
-        status_code = response["status"]
-        headers = {k.decode(): v.decode() for k, v in response["headers"]}
-        body = b"".join(response.get("body", []))
-        
-        return https_fn.Response(
-            body.decode("utf-8") if isinstance(body, bytes) else body,
-            status=status_code,
-            headers=headers
-        )
+        body = b"".join(result_iter)
     finally:
-        loop.close()
+        if hasattr(result_iter, "close"):
+            result_iter.close()
+
+    try:
+        status_code = int(status_line.split(" ", 1)[0])
+    except Exception:
+        status_code = 500
+
+    headers = {k: v for (k, v) in response_headers}
+    headers.update(_cors_headers(req))
+
+    return https_fn.Response(body, status=status_code, headers=headers)
 
 
 # Lazy initialization of Firestore client for scheduled function
