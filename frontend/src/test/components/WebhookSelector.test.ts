@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import WebhookSelector from '@/components/WebhookSelector.vue'
@@ -37,16 +37,16 @@ describe('WebhookSelector', () => {
         userId: 'user1',
         alias: 'Test Webhook',
         url: 'https://example.com/webhook',
-        createdAt: new Date(),
-        updatedAt: new Date()
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
       },
       {
         id: '2',
         userId: 'user1',
         alias: 'Another Webhook',
         url: 'https://example.com/webhook2',
-        createdAt: new Date(),
-        updatedAt: new Date()
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
       }
     ]
 
@@ -81,8 +81,8 @@ describe('WebhookSelector', () => {
         userId: 'user1',
         alias: 'Test Webhook',
         url: 'https://example.com/webhook',
-        createdAt: new Date(),
-        updatedAt: new Date()
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
       }
     ]
 
@@ -115,8 +115,8 @@ describe('WebhookSelector', () => {
         userId: 'user1',
         alias: 'Test Webhook',
         url: 'https://example.com/webhook',
-        createdAt: new Date(),
-        updatedAt: new Date()
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
       }
     ]
 
@@ -175,8 +175,8 @@ describe('WebhookSelector', () => {
         userId: 'user1',
         alias: 'Test Webhook',
         url: 'https://example.com/webhook',
-        createdAt: new Date(),
-        updatedAt: new Date()
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
       }
     ]
 

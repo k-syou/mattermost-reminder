@@ -23,9 +23,9 @@ describe('DaySelector', () => {
     })
 
     const inputs = wrapper.findAll('input[type="checkbox"]')
-    expect(inputs[1].element.checked).toBe(true) // 월
-    expect(inputs[3].element.checked).toBe(true) // 수
-    expect(inputs[5].element.checked).toBe(true) // 금
+    expect((inputs[1].element as HTMLInputElement).checked).toBe(true) // 월
+    expect((inputs[3].element as HTMLInputElement).checked).toBe(true) // 수
+    expect((inputs[5].element as HTMLInputElement).checked).toBe(true) // 금
   })
 
   it('emits update:modelValue when day is toggled', async () => {
@@ -76,8 +76,8 @@ describe('DaySelector', () => {
     await wrapper.setProps({ modelValue: [1, 2, 3] })
 
     const inputs = wrapper.findAll('input[type="checkbox"]')
-    expect(inputs[1].element.checked).toBe(true)
-    expect(inputs[2].element.checked).toBe(true)
-    expect(inputs[3].element.checked).toBe(true)
+    expect((inputs[1].element as HTMLInputElement).checked).toBe(true)
+    expect((inputs[2].element as HTMLInputElement).checked).toBe(true)
+    expect((inputs[3].element as HTMLInputElement).checked).toBe(true)
   })
 })
