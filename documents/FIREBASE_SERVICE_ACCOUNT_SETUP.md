@@ -114,22 +114,66 @@ firebase deploy --only functions
 
 ## 문제 해결
 
+### ⚠️ 중요: 권한 부여 대상 확인
+
+**에러 메시지가 `mattermost-reminder@appspot.gserviceaccount.com`에 대한 권한을 요구하는 경우:**
+
+이것은 **App Engine 기본 Service Account**입니다. 이 계정에 역할을 부여하는 것이 아니라, **GitHub Actions에서 사용하는 Service Account**가 이 계정을 사용할 수 있도록 권한을 부여해야 합니다.
+
+#### 올바른 권한 부여 방법
+
+1. **GitHub Actions에서 사용하는 Service Account 확인:**
+   - `GCP_SA_KEY`에 저장된 JSON 파일을 열어서 `client_email` 필드 확인
+   - 예: `firebase-adminsdk-xxxxx@mattermost-reminder.iam.gserviceaccount.com`
+
+2. **Google Cloud Console IAM 페이지 접속:**
+   - [IAM 페이지](https://console.cloud.google.com/iam-admin/iam?project=mattermost-reminder)
+
+3. **올바른 Service Account 찾기:**
+   - `GCP_SA_KEY`의 `client_email`에 해당하는 Service Account 찾기
+   - **이 Service Account에** 권한을 부여해야 합니다
+
+4. **권한 부여:**
+   - Service Account 행의 "편집" (연필 아이콘) 클릭
+   - "역할 추가" 클릭
+   - 다음 역할 선택:
+     - **Service Account User** (필수) - `mattermost-reminder@appspot.gserviceaccount.com`을 사용할 수 있도록
+     - **Cloud Functions Admin** (권장)
+   - "저장" 클릭
+
+#### 잘못된 방법 (현재 시도한 방법)
+
+❌ `mattermost-reminder@appspot.gserviceaccount.com`에 소유자 역할 부여
+- 이 계정은 App Engine 기본 Service Account로, Firebase Functions 배포 시 사용되는 계정입니다
+- 이 계정에 역할을 부여하는 것은 의미가 없습니다
+
+#### 올바른 방법
+
+✅ GitHub Actions에서 사용하는 Service Account에 권한 부여
+- `GCP_SA_KEY`의 `client_email`에 해당하는 Service Account
+- 이 Service Account가 `mattermost-reminder@appspot.gserviceaccount.com`을 사용할 수 있도록 권한 부여
+
 ### 권한 부여 후에도 에러가 발생하는 경우
 
 1. **권한 전파 대기:**
-   - 권한 변경 후 최대 5분 정도 기다림
+   - 권한 변경 후 최대 5-10분 정도 기다림
    - Google Cloud IAM 변경사항이 전파되는데 시간이 걸림
 
 2. **Service Account 확인:**
+   - `GCP_SA_KEY`의 `client_email`과 IAM에서 찾은 Service Account가 일치하는지 확인
    - 올바른 Service Account에 권한을 부여했는지 확인
-   - `GCP_SA_KEY`에 사용된 Service Account와 일치하는지 확인
 
 3. **프로젝트 확인:**
    - `.firebaserc`의 프로젝트 ID와 Google Cloud Console의 프로젝트가 일치하는지 확인
 
 4. **권한 재확인:**
    - IAM 페이지에서 Service Account의 역할 목록 확인
-   - 필요한 역할이 모두 있는지 확인
+   - **Service Account User** 역할이 있는지 확인
+
+5. **Service Account Key 재생성 (최후의 수단):**
+   - Firebase Console → Project Settings → Service Accounts
+   - 기존 키 삭제 후 새 키 생성
+   - GitHub Secrets의 `GCP_SA_KEY` 업데이트
 
 ## 참고 링크
 

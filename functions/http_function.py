@@ -4,14 +4,17 @@ Firebase Functions HTTP wrapper for FastAPI application
 from firebase_functions import https_fn
 from firebase_admin import initialize_app
 from mangum import Mangum
-import main
 import asyncio
 
-# Initialize Firebase Admin (if not already initialized)
+# Initialize Firebase Admin FIRST before importing main
+# This ensures credentials are available when main.py is imported
 try:
     initialize_app()
 except ValueError:
     pass  # Already initialized
+
+# Import main after Firebase Admin is initialized
+import main
 
 # Create ASGI adapter for FastAPI
 handler = Mangum(main.app, lifespan="off")

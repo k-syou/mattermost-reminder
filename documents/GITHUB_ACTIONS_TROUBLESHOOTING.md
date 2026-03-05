@@ -238,9 +238,75 @@ deploy-frontend:
 
 이렇게 하면 `VERCEL_TOKEN`이 없을 때 job이 스킵됩니다.
 
+## 에러 4: Missing permissions for functions deploy (소유자 역할 부여해도 실패)
+
+### 에러 메시지
+```
+Error: Missing permissions required for functions deploy. 
+You must have permission iam.serviceAccounts.ActAs on service account 
+mattermost-reminder@appspot.gserviceaccount.com.
+```
+
+### ⚠️ 중요: 올바른 Service Account에 권한 부여
+
+**에러 메시지가 `mattermost-reminder@appspot.gserviceaccount.com`에 대한 권한을 요구하는 경우:**
+
+이것은 **App Engine 기본 Service Account**입니다. 이 계정에 역할을 부여하는 것이 아니라, **GitHub Actions에서 사용하는 Service Account**가 이 계정을 사용할 수 있도록 권한을 부여해야 합니다.
+
+#### 올바른 권한 부여 방법
+
+1. **GitHub Actions에서 사용하는 Service Account 확인:**
+   - `GCP_SA_KEY`에 저장된 JSON 파일을 열어서 `client_email` 필드 확인
+   - 예: `firebase-adminsdk-xxxxx@mattermost-reminder.iam.gserviceaccount.com`
+
+2. **Google Cloud Console IAM 페이지 접속:**
+   - [IAM 페이지](https://console.cloud.google.com/iam-admin/iam?project=mattermost-reminder)
+
+3. **올바른 Service Account 찾기:**
+   - `GCP_SA_KEY`의 `client_email`에 해당하는 Service Account 찾기
+   - **이 Service Account에** 권한을 부여해야 합니다
+
+4. **권한 부여:**
+   - Service Account 행의 "편집" (연필 아이콘) 클릭
+   - "역할 추가" 클릭
+   - 다음 역할 선택:
+     - **Service Account User** (필수) - `mattermost-reminder@appspot.gserviceaccount.com`을 사용할 수 있도록
+     - **Cloud Functions Admin** (권장)
+   - "저장" 클릭
+
+#### 잘못된 방법 (현재 시도한 방법)
+
+❌ `mattermost-reminder@appspot.gserviceaccount.com`에 소유자 역할 부여
+- 이 계정은 App Engine 기본 Service Account로, Firebase Functions 배포 시 사용되는 계정입니다
+- 이 계정에 역할을 부여하는 것은 의미가 없습니다
+- 소유자 역할을 부여해도 `iam.serviceAccounts.ActAs` 권한이 해결되지 않습니다
+
+#### 올바른 방법
+
+✅ GitHub Actions에서 사용하는 Service Account에 권한 부여
+- `GCP_SA_KEY`의 `client_email`에 해당하는 Service Account
+- 이 Service Account가 `mattermost-reminder@appspot.gserviceaccount.com`을 사용할 수 있도록 권한 부여
+
+### 권한 부여 후에도 에러가 발생하는 경우
+
+1. **권한 전파 대기:**
+   - 권한 변경 후 최대 5-10분 정도 기다림
+   - Google Cloud IAM 변경사항이 전파되는데 시간이 걸림
+
+2. **Service Account 확인:**
+   - `GCP_SA_KEY`의 `client_email`과 IAM에서 찾은 Service Account가 일치하는지 확인
+   - 올바른 Service Account에 권한을 부여했는지 확인
+
+3. **Service Account Key 재생성 (최후의 수단):**
+   - Firebase Console → Project Settings → Service Accounts
+   - 기존 키 삭제 후 새 키 생성
+   - GitHub Secrets의 `GCP_SA_KEY` 업데이트
+
+자세한 내용은 [`FIREBASE_SERVICE_ACCOUNT_SETUP.md`](FIREBASE_SERVICE_ACCOUNT_SETUP.md)를 참고하세요.
+
 ## 추가 참고사항
 
 - Firebase Token은 만료되지 않지만, 필요시 재생성 가능
-- Google Cloud Service Account는 Cloud Run 배포나 다른 GCP 서비스 사용 시에만 필요
-- Firebase Functions는 Firebase 자체 인증 시스템을 사용하므로 GCP 인증 불필요
+- Google Cloud Service Account는 Firebase Functions 배포에 필수
+- Service Account에 적절한 IAM 역할이 부여되어야 함
 - Vercel 배포는 Secrets가 설정되지 않으면 자동으로 스킵됩니다

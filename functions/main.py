@@ -10,8 +10,9 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Initialize Firebase Admin
+# Note: For Firebase Functions, initialization should happen in http_function.py
+# This is for local development only
 try:
-    # Try to get existing app
     from firebase_admin import get_app
     get_app()
 except ValueError:
@@ -22,10 +23,42 @@ except ValueError:
         cred = credentials.Certificate('serviceAccountKey.json')
         initialize_app(cred)
     else:
-        # Use default credentials (for Firebase Functions)
-        initialize_app()
+        # Try to initialize with default credentials
+        # This will fail in Firebase Functions deployment if not already initialized
+        try:
+            initialize_app()
+        except Exception:
+            # If initialization fails, db will be None and will be initialized later
+            pass
 
-db = firestore.client()
+# Lazy initialization of Firestore client
+_db = None
+
+def get_db():
+    """Get Firestore client with lazy initialization"""
+    global _db
+    if _db is None:
+        # Ensure Firebase Admin is initialized
+        try:
+            from firebase_admin import get_app
+            get_app()
+        except ValueError:
+            # Try to initialize
+            if os.path.exists('serviceAccountKey.json'):
+                cred = credentials.Certificate('serviceAccountKey.json')
+                initialize_app(cred)
+            else:
+                initialize_app()
+        _db = firestore.client()
+    return _db
+
+# For backward compatibility, create db variable that uses lazy initialization
+class LazyDB:
+    """Lazy wrapper for Firestore client"""
+    def __getattr__(self, name):
+        return getattr(get_db(), name)
+
+db = LazyDB()
 
 app = FastAPI(
     title="Mattermost Scheduler API",
