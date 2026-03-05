@@ -304,9 +304,155 @@ mattermost-reminder@appspot.gserviceaccount.com.
 
 자세한 내용은 [`FIREBASE_SERVICE_ACCOUNT_SETUP.md`](FIREBASE_SERVICE_ACCOUNT_SETUP.md)를 참고하세요.
 
+## 에러 5: Functions codebase could not be analyzed (DefaultCredentialsError)
+
+### 에러 메시지
+```
+WARNING: This is a development server. Do not use it in a production deployment.
+ * Running on http://127.0.0.1:8081
+[2026-03-05 07:58:37,599] ERROR in app: Exception on /__/functions.yaml [GET]
+...
+File "/home/runner/work/mattermost-reminder/mattermost-reminder/functions/main.py", line 28, in <module>
+    db = firestore.client()
+         ^^^^^^^^^^^^^^^^^^
+...
+google.auth.exceptions.DefaultCredentialsError: Your default credentials were not found.
+Error: Functions codebase could not be analyzed successfully. It may have a syntax or runtime error
+```
+
+### 원인
+
+Firebase Functions 배포 시 Firebase CLI가 코드를 분석하기 위해 로컬에서 functions-framework를 실행합니다. 이 과정에서:
+
+1. 모든 Python 모듈을 import합니다
+2. 모듈 레벨에서 `firestore.client()`를 호출하면, 이 시점에 Firebase Admin이 아직 초기화되지 않았거나 credentials가 없어 에러가 발생합니다
+3. 특히 `main.py`, `routers/webhooks.py`, `routers/messages.py`, `scheduled_function.py`, `scheduler.py` 등에서 모듈 레벨에서 `db = firestore.client()`를 호출하는 경우 문제가 발생합니다
+
+### 해결 방법
+
+모든 파일에서 모듈 레벨의 `firestore.client()` 호출을 제거하고 **lazy initialization**을 사용합니다.
+
+#### 1. main.py 수정
+
+```python
+# ❌ 잘못된 방법
+db = firestore.client()
+
+# ✅ 올바른 방법
+_db = None
+
+def get_db():
+    """Get Firestore client with lazy initialization"""
+    global _db
+    if _db is None:
+        # Ensure Firebase Admin is initialized
+        try:
+            from firebase_admin import get_app
+            get_app()
+        except ValueError:
+            if os.path.exists('serviceAccountKey.json'):
+                cred = credentials.Certificate('serviceAccountKey.json')
+                initialize_app(cred)
+            else:
+                initialize_app()
+        _db = firestore.client()
+    return _db
+
+class LazyDB:
+    """Lazy wrapper for Firestore client"""
+    def __getattr__(self, name):
+        return getattr(get_db(), name)
+
+db = LazyDB()
+```
+
+#### 2. routers/webhooks.py 및 routers/messages.py 수정
+
+```python
+# ❌ 잘못된 방법
+from main import db
+# 또는
+db = firestore.client()
+
+# ✅ 올바른 방법
+_db = None
+
+def get_db():
+    """Get Firestore client with lazy initialization"""
+    global _db
+    if _db is None:
+        _db = firestore.client()
+    return _db
+
+class LazyDB:
+    """Lazy wrapper for Firestore client"""
+    def __getattr__(self, name):
+        return getattr(get_db(), name)
+
+db = LazyDB()
+```
+
+#### 3. scheduled_function.py 및 scheduler.py 수정
+
+```python
+# ❌ 잘못된 방법
+db = firestore.client()
+
+@scheduler_fn.on_schedule(...)
+def send_scheduled_messages(event):
+    messages_ref = db.collection("messages")
+    # ...
+
+# ✅ 올바른 방법
+_db = None
+
+def get_db():
+    """Get Firestore client with lazy initialization"""
+    global _db
+    if _db is None:
+        _db = firestore.client()
+    return _db
+
+@scheduler_fn.on_schedule(...)
+def send_scheduled_messages(event):
+    db = get_db()  # 함수 내부에서 호출
+    messages_ref = db.collection("messages")
+    # ...
+```
+
+### 왜 이 방법이 작동하는가?
+
+1. **모듈 import 시점**: `LazyDB` 클래스 인스턴스만 생성되고, `firestore.client()`는 호출되지 않습니다
+2. **실제 사용 시점**: `db.collection()` 등이 호출될 때 `__getattr__`가 트리거되어 `get_db()`가 호출되고, 이때 `firestore.client()`가 실행됩니다
+3. **Firebase Functions 환경**: 배포 시 Application Default Credentials가 이미 설정되어 있으므로, 실제 사용 시점에는 정상적으로 작동합니다
+
+### Firebase Functions 배포 과정
+
+"development server" 메시지는 정상입니다:
+
+1. Firebase CLI가 코드 분석을 위해 로컬에서 functions-framework를 실행
+2. 모든 Python 모듈을 import
+3. 모듈 레벨 코드 실행 (이 시점에 credentials가 없으면 에러 발생)
+4. 코드 분석 완료 후 배포 진행
+
+lazy initialization을 사용하면 모듈 import 시점에는 `firestore.client()`가 호출되지 않으므로 에러가 발생하지 않습니다.
+
+### 확인 방법
+
+배포 전 로컬에서 테스트:
+
+```bash
+# functions 디렉토리에서
+python -c "import main; print('Import successful')"
+python -c "from routers import webhooks, messages; print('Import successful')"
+```
+
+모든 import가 성공하면 배포도 성공할 가능성이 높습니다.
+
 ## 추가 참고사항
 
 - Firebase Token은 만료되지 않지만, 필요시 재생성 가능
 - Google Cloud Service Account는 Firebase Functions 배포에 필수
 - Service Account에 적절한 IAM 역할이 부여되어야 함
 - Vercel 배포는 Secrets가 설정되지 않으면 자동으로 스킵됩니다
+- Firebase Functions 배포 시 모듈 레벨에서 `firestore.client()`를 호출하지 않도록 주의
