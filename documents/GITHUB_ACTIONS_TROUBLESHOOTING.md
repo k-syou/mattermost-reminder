@@ -186,8 +186,61 @@ deploy-backend:
 1. ✅ `FIREBASE_TOKEN` secret이 설정되어 있음
 2. ✅ Secret 값이 올바른지 확인 (토큰이 만료되지 않았는지)
 
+## 에러 3: Vercel token not supplied
+
+### 에러 메시지
+```
+Error: Input required and not supplied: vercel-token
+```
+
+### 원인
+
+`amondnet/vercel-action@v25`를 사용할 때:
+1. `VERCEL_TOKEN` secret이 설정되지 않았거나
+2. Secret이 비어있거나
+3. Secret이 workflow에 전달되지 않음
+
+### 해결 방법
+
+#### 방법 1: Vercel Secrets 설정 (권장)
+
+1. **Vercel Token 생성:**
+   - [Vercel Dashboard](https://vercel.com/account/tokens) 접속
+   - "Create Token" 클릭
+   - Token 이름 입력 (예: "GitHub Actions")
+   - Scope: Full Account 선택
+   - 생성된 토큰 복사
+
+2. **GitHub Secrets에 추가:**
+   - Repository → Settings → Secrets and variables → Actions
+   - "New repository secret" 클릭
+   - Name: `VERCEL_TOKEN`
+   - Value: 생성한 토큰 붙여넣기
+
+3. **Vercel Org ID 및 Project ID 확인:**
+   - Vercel Dashboard → 프로젝트 → Settings → General
+   - Org ID와 Project ID 확인
+   - 각각 `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`로 GitHub Secrets에 추가
+
+#### 방법 2: 조건부 배포 (Secrets가 없을 때 스킵)
+
+Secrets가 설정되지 않은 경우 배포를 스킵하도록 설정:
+
+```yaml
+deploy-frontend:
+  name: Deploy Frontend to Vercel
+  runs-on: ubuntu-latest
+  if: secrets.VERCEL_TOKEN != ''
+  
+  steps:
+    # ... 배포 steps
+```
+
+이렇게 하면 `VERCEL_TOKEN`이 없을 때 job이 스킵됩니다.
+
 ## 추가 참고사항
 
 - Firebase Token은 만료되지 않지만, 필요시 재생성 가능
 - Google Cloud Service Account는 Cloud Run 배포나 다른 GCP 서비스 사용 시에만 필요
 - Firebase Functions는 Firebase 자체 인증 시스템을 사용하므로 GCP 인증 불필요
+- Vercel 배포는 Secrets가 설정되지 않으면 자동으로 스킵됩니다
