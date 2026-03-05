@@ -5,7 +5,7 @@ import { createPinia, setActivePinia } from 'pinia'
 // Mock Firebase before any imports
 const mockAuth = {
   currentUser: null,
-  onAuthStateChanged: vi.fn((auth, callback) => {
+  onAuthStateChanged: vi.fn((_auth, callback) => {
     // Call callback immediately with null user
     callback(null)
     // Return unsubscribe function
@@ -30,7 +30,7 @@ vi.mock('@/config/firebase', () => ({
 // Mock firebase/auth functions
 vi.mock('firebase/auth', () => ({
   getAuth: vi.fn(() => mockAuth),
-  onAuthStateChanged: vi.fn((auth, callback) => {
+  onAuthStateChanged: vi.fn((_auth, callback) => {
     callback(null)
     return vi.fn()
   }),
