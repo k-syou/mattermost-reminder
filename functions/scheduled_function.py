@@ -14,7 +14,15 @@ try:
 except ValueError:
     pass  # Already initialized
 
-db = firestore.client()
+# Lazy initialization of Firestore client
+_db = None
+
+def get_db():
+    """Get Firestore client with lazy initialization"""
+    global _db
+    if _db is None:
+        _db = firestore.client()
+    return _db
 
 
 @scheduler_fn.on_schedule(
@@ -27,6 +35,9 @@ def send_scheduled_messages(event: scheduler_fn.ScheduledEvent) -> None:
     Check for messages that should be sent now and send them to Mattermost
     This function is triggered by Cloud Scheduler every minute
     """
+    # Get Firestore client (lazy initialization)
+    db = get_db()
+    
     # Get current time in Asia/Seoul timezone
     seoul_tz = pytz.timezone("Asia/Seoul")
     now = datetime.now(seoul_tz)

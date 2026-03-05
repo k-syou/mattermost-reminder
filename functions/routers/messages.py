@@ -10,7 +10,24 @@ from dependencies import get_current_user
 from models import MessageCreate, MessageUpdate, MessageResponse
 
 router = APIRouter()
-db = firestore.client()
+
+# Lazy initialization of Firestore client to avoid import-time errors
+_db = None
+
+def get_db():
+    """Get Firestore client with lazy initialization"""
+    global _db
+    if _db is None:
+        _db = firestore.client()
+    return _db
+
+# For backward compatibility
+class LazyDB:
+    """Lazy wrapper for Firestore client"""
+    def __getattr__(self, name):
+        return getattr(get_db(), name)
+
+db = LazyDB()
 
 
 @router.post("", response_model=MessageResponse, status_code=201)
