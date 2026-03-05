@@ -125,7 +125,7 @@ jobs:
         run: npm install -g vercel@latest
       
       - name: Deploy to Vercel
-        if: ${{ secrets.VERCEL_TOKEN }}
+        continue-on-error: true
         uses: amondnet/vercel-action@v25
         with:
           vercel-token: ${{ secrets.VERCEL_TOKEN }}
