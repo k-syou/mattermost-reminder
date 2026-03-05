@@ -1,0 +1,180 @@
+"""
+Webhook CRUD API endpoints
+"""
+from fastapi import APIRouter, HTTPException, Depends
+from firebase_admin import firestore
+from typing import List
+from datetime import datetime
+
+from dependencies import get_current_user
+from models import WebhookCreate, WebhookUpdate, WebhookResponse
+
+router = APIRouter()
+db = firestore.client()
+
+
+@router.post("", response_model=WebhookResponse, status_code=201)
+async def create_webhook(
+    webhook: WebhookCreate,
+    current_user: dict = Depends(get_current_user)
+):
+    """Create a new webhook"""
+    try:
+        webhook_data = {
+            "userId": current_user["uid"],
+            "alias": webhook.alias,
+            "url": str(webhook.url),
+            "createdAt": firestore.SERVER_TIMESTAMP,
+            "updatedAt": firestore.SERVER_TIMESTAMP
+        }
+        
+        doc_ref = db.collection("webhooks").add(webhook_data)
+        webhook_id = doc_ref[1].id
+        
+        # Fetch the created document
+        doc = db.collection("webhooks").document(webhook_id).get()
+        doc_data = doc.to_dict()
+        
+        return WebhookResponse(
+            id=webhook_id,
+            userId=doc_data["userId"],
+            alias=doc_data["alias"],
+            url=doc_data["url"],
+            createdAt=doc_data["createdAt"],
+            updatedAt=doc_data["updatedAt"]
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to create webhook: {str(e)}")
+
+
+@router.get("", response_model=List[WebhookResponse])
+async def list_webhooks(current_user: dict = Depends(get_current_user)):
+    """Get all webhooks for the current user"""
+    try:
+        webhooks_ref = db.collection("webhooks")
+        query = webhooks_ref.where("userId", "==", current_user["uid"]).order_by("createdAt")
+        
+        docs = query.stream()
+        webhooks = []
+        
+        for doc in docs:
+            doc_data = doc.to_dict()
+            webhooks.append(WebhookResponse(
+                id=doc.id,
+                userId=doc_data["userId"],
+                alias=doc_data["alias"],
+                url=doc_data["url"],
+                createdAt=doc_data["createdAt"],
+                updatedAt=doc_data["updatedAt"]
+            ))
+        
+        return webhooks
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch webhooks: {str(e)}")
+
+
+@router.get("/{webhook_id}", response_model=WebhookResponse)
+async def get_webhook(
+    webhook_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get a specific webhook by ID"""
+    try:
+        doc_ref = db.collection("webhooks").document(webhook_id)
+        doc = doc_ref.get()
+        
+        if not doc.exists:
+            raise HTTPException(status_code=404, detail="Webhook not found")
+        
+        doc_data = doc.to_dict()
+        
+        # Check ownership
+        if doc_data["userId"] != current_user["uid"]:
+            raise HTTPException(status_code=403, detail="Access denied")
+        
+        return WebhookResponse(
+            id=doc.id,
+            userId=doc_data["userId"],
+            alias=doc_data["alias"],
+            url=doc_data["url"],
+            createdAt=doc_data["createdAt"],
+            updatedAt=doc_data["updatedAt"]
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch webhook: {str(e)}")
+
+
+@router.put("/{webhook_id}", response_model=WebhookResponse)
+async def update_webhook(
+    webhook_id: str,
+    webhook: WebhookUpdate,
+    current_user: dict = Depends(get_current_user)
+):
+    """Update a webhook"""
+    try:
+        doc_ref = db.collection("webhooks").document(webhook_id)
+        doc = doc_ref.get()
+        
+        if not doc.exists:
+            raise HTTPException(status_code=404, detail="Webhook not found")
+        
+        doc_data = doc.to_dict()
+        
+        # Check ownership
+        if doc_data["userId"] != current_user["uid"]:
+            raise HTTPException(status_code=403, detail="Access denied")
+        
+        # Prepare update data
+        update_data = {"updatedAt": firestore.SERVER_TIMESTAMP}
+        if webhook.alias is not None:
+            update_data["alias"] = webhook.alias
+        if webhook.url is not None:
+            update_data["url"] = str(webhook.url)
+        
+        doc_ref.update(update_data)
+        
+        # Fetch updated document
+        updated_doc = doc_ref.get()
+        updated_data = updated_doc.to_dict()
+        
+        return WebhookResponse(
+            id=updated_doc.id,
+            userId=updated_data["userId"],
+            alias=updated_data["alias"],
+            url=updated_data["url"],
+            createdAt=updated_data["createdAt"],
+            updatedAt=updated_data["updatedAt"]
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to update webhook: {str(e)}")
+
+
+@router.delete("/{webhook_id}", status_code=204)
+async def delete_webhook(
+    webhook_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Delete a webhook"""
+    try:
+        doc_ref = db.collection("webhooks").document(webhook_id)
+        doc = doc_ref.get()
+        
+        if not doc.exists:
+            raise HTTPException(status_code=404, detail="Webhook not found")
+        
+        doc_data = doc.to_dict()
+        
+        # Check ownership
+        if doc_data["userId"] != current_user["uid"]:
+            raise HTTPException(status_code=403, detail="Access denied")
+        
+        doc_ref.delete()
+        return None
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to delete webhook: {str(e)}")

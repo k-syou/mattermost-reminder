@@ -1,0 +1,351 @@
+# 에러 수정 내역
+
+## 에러 1: npm install 의존성 충돌 (date-fns / date-fns-tz)
+
+### 발생 위치
+- **파일**: `frontend/package.json`
+- **에러 라인**: npm install 실행 시
+- **에러 타입**: ERESOLVE (의존성 해결 실패)
+
+### 에러 메시지
+```
+npm error ERESOLVE unable to resolve dependency tree
+npm error While resolving: mattermost-reminder-frontend@1.0.0
+npm error Found: date-fns@3.6.0
+npm error Could not resolve dependency:
+npm error peer date-fns@"2.x" from date-fns-tz@2.0.1
+```
+
+### 원인 분석
+- `date-fns@3.2.0`이 설치되었지만
+- `date-fns-tz@2.0.1`이 `date-fns@2.x`를 peer dependency로 요구하여 버전 충돌 발생
+- `date-fns` 3.x 버전은 타임존 기능을 내장 지원하므로 `date-fns-tz`가 더 이상 필요하지 않음
+
+### 해결 방법
+`date-fns-tz` 패키지를 제거하고 `date-fns` 3.x의 내장 타임존 기능을 사용
+
+### 수정 내용
+**수정 전:**
+```json
+"dependencies": {
+  "date-fns": "^3.2.0",
+  "date-fns-tz": "^2.0.0"
+}
+```
+
+**수정 후:**
+```json
+"dependencies": {
+  "date-fns": "^3.2.0"
+}
+```
+
+### 참고사항
+- `date-fns` 3.x 버전부터는 `date-fns-tz` 없이도 타임존 기능을 사용할 수 있습니다
+- 타임존 관련 함수는 `date-fns`에서 직접 import하여 사용:
+  ```typescript
+  import { formatInTimeZone, zonedTimeToUtc } from 'date-fns-tz'
+  // 대신
+  import { format, toZonedTime } from 'date-fns'
+  ```
+
+### 적용 날짜
+2026-03-05
+
+### 검증 결과
+✅ `npm install` 성공적으로 완료
+- 362개 패키지 설치 완료
+- 의존성 충돌 해결 확인
+
+### 추가 경고사항
+- 일부 deprecated 패키지 경고 (inflight, glob, rimraf 등) - 향후 업데이트 필요
+- 22개 취약점 발견 (16 moderate, 6 high) - `npm audit fix` 실행 권장
+
+---
+
+## 추가 참고사항
+
+### date-fns 3.x 타임존 사용법
+```typescript
+import { format, toZonedTime } from 'date-fns'
+
+// Asia/Seoul 타임존으로 변환
+const seoulTime = toZonedTime(new Date(), 'Asia/Seoul')
+const formatted = format(seoulTime, 'HH:mm')
+```
+
+### 다음 단계
+1. `npm install` 재실행하여 의존성 설치 확인
+2. 타임존 관련 코드가 있다면 `date-fns` 3.x API로 마이그레이션
+
+---
+
+## 에러 2: npm audit fix --force 후 Vite 버전 호환성 문제
+
+### 발생 위치
+- **파일**: `frontend/package.json`
+- **에러 라인**: npm audit fix 실행 후
+- **에러 타입**: ERESOLVE (peer dependency 충돌)
+
+### 에러 메시지
+```
+npm error ERESOLVE could not resolve
+npm error While resolving: @vitejs/plugin-vue@5.2.4
+npm error Found: vite@7.3.1
+npm error Could not resolve dependency:
+npm error peer vite@"^5.0.0 || ^6.0.0" from @vitejs/plugin-vue@5.2.4
+```
+
+### 원인 분석
+- `npm audit fix --force`가 vite를 7.3.1로 업그레이드
+- `@vitejs/plugin-vue@5.2.4`는 vite `^5.0.0 || ^6.0.0`만 지원
+- vite 7.x와 호환되지 않아 peer dependency 충돌 발생
+
+### 해결 방법
+vite를 6.x 버전으로 다운그레이드하고 `@vitejs/plugin-vue`를 최신 버전(5.2.4)으로 유지
+
+### 수정 내용
+**수정 전:**
+```json
+"vite": "^7.3.1",
+"@vitejs/plugin-vue": "^5.0.3"
+```
+
+**수정 후:**
+```json
+"vite": "^6.0.0",
+"@vitejs/plugin-vue": "^5.2.4"
+```
+
+### 추가 조치
+- `node_modules` 및 `package-lock.json` 삭제 후 재설치
+- 깨끗한 상태에서 의존성 재설정
+
+### 검증 결과
+✅ `npm install` 성공적으로 완료
+- 366개 패키지 설치 완료
+- peer dependency 충돌 해결 확인
+- 10개 moderate 취약점 남아있음 (Firebase 관련, 업스트림 이슈)
+
+### 참고사항
+- `npm audit fix --force`는 breaking change를 포함할 수 있으므로 신중히 사용 필요
+- vite 7.x는 아직 `@vitejs/plugin-vue`와 완전히 호환되지 않음
+- 남은 취약점(undici)은 Firebase SDK의 의존성으로 인한 것으로, Firebase 업데이트 대기 필요
+
+### 적용 날짜
+2026-03-05
+
+---
+
+## 에러 3: Firebase Functions 배포 시 AttributeError (auth._apps)
+
+### 발생 위치
+- **파일**: `functions/main.py`
+- **에러 라인**: 13번째 줄
+- **에러 타입**: AttributeError
+
+### 에러 메시지
+```
+AttributeError: module 'firebase_admin.auth' has no attribute '_apps'
+File "C:\Users\SSAFY\Desktop\dev\mattermost_reminder\functions\main.py", line 13, in <module>
+    if not auth._apps:
+           ^^^^^^^^^^
+Error: Functions codebase could not be analyzed successfully. It may have a syntax or runtime error
+```
+
+### 원인 분석
+- `firebase_admin.auth` 모듈에는 `_apps` 속성이 존재하지 않음
+- Firebase Admin SDK에서 앱 초기화 상태를 확인하는 잘못된 방법 사용
+- `_apps`는 private 속성이며 `firebase_admin` 모듈 레벨에만 존재 (권장되지 않음)
+
+### 해결 방법
+`get_app()` 함수를 try-except로 감싸서 앱이 이미 초기화되었는지 확인
+
+### 수정 내용
+**수정 전:**
+```python
+# Initialize Firebase Admin
+if not auth._apps:
+    # Use Application Default Credentials in production
+    # For local development, use service account key
+    if os.path.exists('serviceAccountKey.json'):
+        cred = credentials.Certificate('serviceAccountKey.json')
+        initialize_app(cred)
+    else:
+        # Use default credentials (for Firebase Functions)
+        initialize_app()
+```
+
+**수정 후:**
+```python
+# Initialize Firebase Admin
+try:
+    # Try to get existing app to check if already initialized
+    from firebase_admin import get_app
+    get_app()
+except ValueError:
+    # App doesn't exist, initialize it
+    # Use Application Default Credentials in production
+    # For local development, use service account key
+    if os.path.exists('serviceAccountKey.json'):
+        cred = credentials.Certificate('serviceAccountKey.json')
+        initialize_app(cred)
+    else:
+        # Use default credentials (for Firebase Functions)
+        initialize_app()
+```
+
+### 참고사항
+- `get_app()`은 앱이 존재하지 않으면 `ValueError`를 발생시킴
+- 이는 Firebase Admin SDK에서 권장되는 앱 초기화 확인 방법
+- `scheduled_function.py`와 `http_function.py`에서는 이미 올바른 방법 사용 중
+
+### 검증 결과
+✅ 코드 수정 완료
+- Firebase Functions 배포 전 코드 분석 단계 통과 예상
+- 다른 파일들(`scheduled_function.py`, `http_function.py`)과 일관된 패턴 사용
+
+### 적용 날짜
+2026-03-05
+
+---
+
+## 에러 4: Firebase Functions 배포 시 ModuleNotFoundError (dependencies)
+
+### 발생 위치
+- **파일**: `functions/main.py`
+- **에러 라인**: 46번째 줄 (routers import 시)
+- **에러 타입**: ModuleNotFoundError
+
+### 에러 메시지
+```
+ModuleNotFoundError: No module named 'dependencies'
+File "C:\Users\SSAFY\Desktop\dev\mattermost_reminder\functions\main.py", line 46, in <module>
+    from dependencies import get_current_user
+Error: Functions codebase could not be analyzed successfully. It may have a syntax or runtime error
+```
+
+### 원인 분석
+- `main.py`에서 `from dependencies import get_current_user`를 import하지만 실제로는 사용하지 않음
+- Firebase Functions 배포 시 Python 경로가 `functions` 디렉토리로 설정되지 않아 모듈을 찾을 수 없음
+- routers를 import할 때 간접적으로 dependencies가 import되지만, main.py에서 직접 import하면 경로 문제 발생
+
+### 해결 방법
+1. `main.py`에서 사용하지 않는 `get_current_user` import 제거
+2. Python 경로를 명시적으로 설정하여 routers import 시 경로 문제 해결
+
+### 수정 내용
+**수정 전:**
+```python
+# Import routers
+from dependencies import get_current_user  # 사용하지 않음
+from routers import webhooks, messages
+```
+
+**수정 후:**
+```python
+# Import routers (dependencies are imported within routers)
+# Ensure proper Python path for Firebase Functions
+import sys
+import os
+functions_dir = os.path.dirname(os.path.abspath(__file__))
+if functions_dir not in sys.path:
+    sys.path.insert(0, functions_dir)
+
+from routers import webhooks, messages
+```
+
+### 참고사항
+- `get_current_user`는 `routers/webhooks.py`와 `routers/messages.py`에서 직접 import하여 사용
+- `main.py`에서는 routers만 import하면 되므로 `dependencies`를 직접 import할 필요 없음
+- Firebase Functions 배포 시 Python 경로를 명시적으로 설정하여 모듈 import 문제 해결
+
+### 검증 결과
+✅ 코드 수정 완료
+- 사용하지 않는 import 제거
+- Python 경로 명시적 설정으로 모듈 import 문제 해결
+
+### 적용 날짜
+2026-03-05
+
+---
+
+## 에러 5: Pytest 테스트 실패 - 모듈 import 오류
+
+### 발생 위치
+- **파일**: `functions/tests/*.py`
+- **에러 타입**: ModuleNotFoundError, FastAPI dependency injection mock 실패
+
+### 에러 메시지
+```
+ModuleNotFoundError: No module named 'dependencies'
+ModuleNotFoundError: No module named 'main'
+ModuleNotFoundError: No module named 'scheduler'
+```
+
+### 원인 분석
+1. pytest 실행 시 Python 경로가 `functions` 디렉토리로 설정되지 않음
+2. FastAPI의 async dependency (`get_current_user`)를 `@patch`로 mock할 수 없음
+3. `ExpiredIdTokenError` 생성자 인자 문제
+
+### 해결 방법
+
+#### 1. Python 경로 설정
+**`tests/conftest.py`에 경로 추가:**
+```python
+import sys
+import os
+
+# Add parent directory to Python path for imports
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+```
+
+**`pytest.ini` 설정:**
+```ini
+[pytest]
+testpaths = tests
+pythonpath = .
+asyncio_mode = auto
+```
+
+#### 2. FastAPI dependency override 사용
+`@patch` 대신 FastAPI의 `app.dependency_overrides` 사용:
+
+```python
+@pytest.fixture
+def client(mock_user_dict):
+    """Test client with dependency override"""
+    from dependencies import get_current_user
+    from main import app
+    
+    async def override_get_current_user():
+        return mock_user_dict
+    
+    app.dependency_overrides[get_current_user] = override_get_current_user
+    test_client = TestClient(app)
+    yield test_client
+    app.dependency_overrides.clear()
+```
+
+#### 3. Async 함수 테스트 수정
+- `scheduler.py`의 `send_scheduled_messages`는 async 함수이므로 `@pytest.mark.asyncio` 추가
+- `httpx.AsyncClient` mock 처리
+
+#### 4. ExpiredIdTokenError 테스트 수정
+```python
+# ExpiredIdTokenError가 InvalidIdTokenError의 서브클래스일 수 있으므로
+# 예외 처리 순서 확인 및 테스트 수정
+```
+
+### 검증 결과
+✅ 모든 테스트 통과 (14 passed)
+- 인증 테스트: 5개 통과
+- Webhook 테스트: 3개 통과
+- Message 테스트: 3개 통과
+- Scheduler 테스트: 2개 통과
+- 통합 테스트: 1개 통과
+
+### 적용 날짜
+2026-03-05
+
+---

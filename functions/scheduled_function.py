@@ -1,0 +1,77 @@
+"""
+Firebase Scheduled Function for sending scheduled messages
+This function runs every minute via Cloud Scheduler
+"""
+from firebase_functions import scheduler_fn
+from firebase_admin import initialize_app, firestore
+from datetime import datetime
+import httpx
+import pytz
+
+# Initialize Firebase Admin (if not already initialized)
+try:
+    initialize_app()
+except ValueError:
+    pass  # Already initialized
+
+db = firestore.client()
+
+
+@scheduler_fn.on_schedule(
+    schedule="every 1 minutes",
+    timezone="Asia/Seoul",
+    region="asia-northeast3"
+)
+def send_scheduled_messages(event: scheduler_fn.ScheduledEvent) -> None:
+    """
+    Check for messages that should be sent now and send them to Mattermost
+    This function is triggered by Cloud Scheduler every minute
+    """
+    # Get current time in Asia/Seoul timezone
+    seoul_tz = pytz.timezone("Asia/Seoul")
+    now = datetime.now(seoul_tz)
+    current_day = now.weekday()  # 0=Monday, 6=Sunday
+    current_time = now.strftime("%H:%M")
+    
+    # Query active messages
+    messages_ref = db.collection("messages")
+    query = messages_ref.where("isActive", "==", True)
+    
+    messages_to_send = []
+    for doc in query.stream():
+        data = doc.to_dict()
+        days_of_week = data.get("daysOfWeek", [])
+        send_time = data.get("sendTime", "")
+        
+        # Check if current day matches and time matches
+        if current_day in days_of_week and send_time == current_time:
+            messages_to_send.append({
+                "id": doc.id,
+                "content": data.get("content", ""),
+                "webhookUrl": data.get("webhookUrl", "")
+            })
+    
+    # Send messages
+    results = []
+    for message in messages_to_send:
+        try:
+            response = httpx.post(
+                message["webhookUrl"],
+                json={"text": message["content"]},
+                timeout=10.0
+            )
+            response.raise_for_status()
+            results.append({
+                "id": message["id"],
+                "status": "success",
+                "sentAt": datetime.now(seoul_tz).isoformat()
+            })
+        except Exception as e:
+            results.append({
+                "id": message["id"],
+                "status": "error",
+                "error": str(e),
+                "sentAt": datetime.now(seoul_tz).isoformat()
+            })
+    
+    print(f"Processed {len(results)} messages: {sum(1 for r in results if r['status'] == 'success')} success, {sum(1 for r in results if r['status'] == 'error')} errors")
