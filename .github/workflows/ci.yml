@@ -4,10 +4,12 @@ on:
   push:
     branches:
       - main
+      - master
       - develop
   pull_request:
     branches:
       - main
+      - master
       - develop
 
 jobs:
@@ -67,7 +69,7 @@ jobs:
     name: Deploy Backend (Firebase Functions)
     runs-on: ubuntu-latest
     needs: [backend-test]
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') && github.event_name == 'push'
     
     steps:
       - name: Checkout code
@@ -108,7 +110,7 @@ jobs:
     name: Deploy Frontend (Vercel)
     runs-on: ubuntu-latest
     needs: [frontend-test]
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') && github.event_name == 'push'
     
     steps:
       - name: Checkout code
