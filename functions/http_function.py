@@ -20,14 +20,7 @@ import main
 handler = Mangum(main.app, lifespan="off")
 
 
-@https_fn.on_request(
-    cors=https_fn.CorsOptions(
-        cors_origins=["*"],
-        cors_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-        cors_allow_headers=["Authorization", "Content-Type"],
-        cors_max_age=3600
-    )
-)
+@https_fn.on_request()
 def api(req: https_fn.Request) -> https_fn.Response:
     """
     Firebase HTTP Function that wraps the FastAPI application
