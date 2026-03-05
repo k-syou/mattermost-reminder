@@ -58,11 +58,12 @@ Firebase Functions 배포를 위해 다음 역할이 필요합니다:
    - 역할 ID: `roles/iam.serviceAccountUser`
    - Service Account를 대신하여 작업 수행
 
-#### 권장 역할
+#### 필수 역할 (HTTPS Functions 배포 시)
 
-2. **Cloud Functions Admin**
+2. **Cloud Functions Admin** (필수)
    - 역할 ID: `roles/cloudfunctions.admin`
    - Cloud Functions 생성, 업데이트, 삭제
+   - **`cloudfunctions.functions.setIamPolicy` 권한 포함** (HTTPS Functions 배포에 필수)
 
 3. **Storage Admin** (선택사항)
    - 역할 ID: `roles/storage.admin`

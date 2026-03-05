@@ -247,6 +247,16 @@ You must have permission iam.serviceAccounts.ActAs on service account
 mattermost-reminder@appspot.gserviceaccount.com.
 ```
 
+또는
+
+```
+Error: Missing required permission on project mattermost-reminder to deploy new HTTPS functions. 
+The permission cloudfunctions.functions.setIamPolicy is required to deploy the following functions:
+- api
+
+To address this error, please ask a project Owner to assign your account the "Cloud Functions Admin" role.
+```
+
 ### ⚠️ 중요: 올바른 Service Account에 권한 부여
 
 **에러 메시지가 `mattermost-reminder@appspot.gserviceaccount.com`에 대한 권한을 요구하는 경우:**
@@ -271,8 +281,14 @@ mattermost-reminder@appspot.gserviceaccount.com.
    - "역할 추가" 클릭
    - 다음 역할 선택:
      - **Service Account User** (필수) - `mattermost-reminder@appspot.gserviceaccount.com`을 사용할 수 있도록
-     - **Cloud Functions Admin** (권장)
+     - **Cloud Functions Admin** (필수) - `cloudfunctions.functions.setIamPolicy` 권한 포함
    - "저장" 클릭
+
+⚠️ **중요**: `cloudfunctions.functions.setIamPolicy` 권한 에러가 발생하는 경우, **Cloud Functions Admin** 역할이 반드시 필요합니다. 이 역할에는 다음 권한이 포함됩니다:
+- `cloudfunctions.functions.create`
+- `cloudfunctions.functions.update`
+- `cloudfunctions.functions.delete`
+- `cloudfunctions.functions.setIamPolicy` (IAM 정책 설정)
 
 #### 잘못된 방법 (현재 시도한 방법)
 
@@ -449,6 +465,110 @@ python -c "from routers import webhooks, messages; print('Import successful')"
 
 모든 import가 성공하면 배포도 성공할 가능성이 높습니다.
 
+## 에러 6: "Unexpected token '<', "<!DOCTYPE "... is not valid JSON" (프로덕션 배포)
+
+### 에러 메시지
+
+프론트엔드에서 API 호출 시:
+- "Unexpected token '<', "<!DOCTYPE "... is not valid JSON"
+- "웹훅 생성에 실패했습니다."
+- "메시지 관리도 동일한 에러 발생"
+
+### 원인
+
+1. **환경 변수 미설정**: `VITE_API_BASE_URL`이 설정되지 않아 API 요청이 잘못된 경로로 전송됨
+2. **Vercel Rewrite 규칙**: `vercel.json`의 rewrite 규칙에 의해 모든 요청이 `/index.html`로 리다이렉트되어 HTML이 반환됨
+3. **Firebase Functions URL 미설정**: Firebase Functions의 HTTP Function URL이 프론트엔드에 설정되지 않음
+
+### 해결 방법
+
+#### 1단계: Firebase Functions URL 확인
+
+Firebase Functions 배포 후 다음 명령어로 URL 확인:
+
+```bash
+firebase functions:list
+```
+
+또는 Firebase Console에서:
+- Firebase Console → Functions
+- `api` 함수의 URL 확인
+- 예: `https://asia-northeast3-mattermost-reminder.cloudfunctions.net/api`
+
+#### 2단계: Vercel 환경 변수 설정
+
+Vercel Dashboard에서 환경 변수 추가:
+
+1. **Vercel Dashboard 접속:**
+   - 프로젝트 선택 → Settings → Environment Variables
+
+2. **환경 변수 추가:**
+   - Name: `VITE_API_BASE_URL`
+   - Value: Firebase Functions URL (예: `https://asia-northeast3-mattermost-reminder.cloudfunctions.net`)
+   - Environment: Production, Preview, Development 모두 선택
+
+3. **재배포:**
+   - Settings → Deployments → 최신 배포의 "Redeploy" 클릭
+   - 또는 코드를 다시 푸시하여 자동 재배포
+
+#### 3단계: vercel.json 수정 (선택사항)
+
+API 요청을 Firebase Functions로 프록시하도록 설정:
+
+```json
+{
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://asia-northeast3-mattermost-reminder.cloudfunctions.net/api/:path*"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}
+```
+
+이 경우 `VITE_API_BASE_URL`을 빈 문자열로 설정하거나 설정하지 않아도 됩니다.
+
+### 확인 방법
+
+1. **브라우저 개발자 도구 확인:**
+   - Network 탭에서 API 요청 URL 확인
+   - 올바른 Firebase Functions URL로 요청이 가는지 확인
+
+2. **환경 변수 확인:**
+   ```javascript
+   console.log('API Base URL:', import.meta.env.VITE_API_BASE_URL)
+   ```
+
+3. **API 응답 확인:**
+   - Network 탭에서 응답이 JSON인지 확인
+   - HTML이 반환되면 경로가 잘못된 것
+
+### 추가 문제 해결
+
+#### CORS 에러가 발생하는 경우
+
+Firebase Functions의 CORS 설정 확인:
+- `http_function.py`의 `cors_origins`에 프론트엔드 도메인 추가
+- 또는 `["*"]`로 설정 (개발 환경용)
+
+#### 404 에러가 발생하는 경우
+
+1. Firebase Functions가 제대로 배포되었는지 확인:
+   ```bash
+   firebase functions:list
+   ```
+
+2. 함수 이름이 `api`인지 확인:
+   - `http_function.py`의 함수 이름이 `api`인지 확인
+
+3. Firebase Functions URL 형식 확인:
+   - `https://{region}-{project-id}.cloudfunctions.net/{function-name}`
+   - 예: `https://asia-northeast3-mattermost-reminder.cloudfunctions.net/api`
+
 ## 추가 참고사항
 
 - Firebase Token은 만료되지 않지만, 필요시 재생성 가능
@@ -456,3 +576,4 @@ python -c "from routers import webhooks, messages; print('Import successful')"
 - Service Account에 적절한 IAM 역할이 부여되어야 함
 - Vercel 배포는 Secrets가 설정되지 않으면 자동으로 스킵됩니다
 - Firebase Functions 배포 시 모듈 레벨에서 `firestore.client()`를 호출하지 않도록 주의
+- 프로덕션 배포 시 `VITE_API_BASE_URL` 환경 변수 필수 설정
