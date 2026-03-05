@@ -104,7 +104,12 @@ jobs:
       - name: Deploy to Firebase Functions
         working-directory: ./functions
         run: |
-          firebase deploy --only functions
+          firebase deploy --only functions --force || true
+      
+      - name: Set up cleanup policy for artifacts
+        working-directory: ./functions
+        run: |
+          firebase functions:artifacts:setpolicy --force || true
 
   frontend-deploy:
     name: Deploy Frontend (Vercel)
