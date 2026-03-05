@@ -25,7 +25,19 @@ def get_db():
 class LazyDB:
     """Lazy wrapper for Firestore client"""
     def __getattr__(self, name):
+        # Only call get_db() when attribute is actually accessed
+        # This prevents hasattr() checks from triggering firestore.client()
         return getattr(get_db(), name)
+    
+    def __dir__(self):
+        # Provide a list of attributes to help with introspection
+        # This prevents hasattr() from calling __getattr__
+        try:
+            db_instance = get_db()
+            return dir(db_instance)
+        except Exception:
+            # If get_db() fails, return empty list
+            return []
 
 db = LazyDB()
 

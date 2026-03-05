@@ -8,10 +8,10 @@ import pytz
 from scheduler import send_scheduled_messages
 
 
-@patch('scheduler.db')
+@patch('scheduler.get_db')
 @patch('scheduler.httpx')
 @pytest.mark.asyncio
-async def test_send_scheduled_messages_success(mock_httpx, mock_db):
+async def test_send_scheduled_messages_success(mock_httpx, mock_get_db):
     """Test successful message sending"""
     # Mock current time (Monday 09:00)
     seoul_tz = pytz.timezone("Asia/Seoul")
@@ -42,7 +42,9 @@ async def test_send_scheduled_messages_success(mock_httpx, mock_db):
     # Mock Firestore query
     mock_query = Mock()
     mock_query.stream.return_value = [mock_doc1, mock_doc2]
+    mock_db = Mock()
     mock_db.collection.return_value.where.return_value = mock_query
+    mock_get_db.return_value = mock_db
     
     # Mock HTTP response (async)
     mock_response = AsyncMock()
@@ -62,14 +64,16 @@ async def test_send_scheduled_messages_success(mock_httpx, mock_db):
     assert result["processed"] >= 0
 
 
-@patch('scheduler.db')
+@patch('scheduler.get_db')
 @pytest.mark.asyncio
-async def test_send_scheduled_messages_no_matches(mock_db):
+async def test_send_scheduled_messages_no_matches(mock_get_db):
     """Test scheduler when no messages match"""
     # Mock Firestore query with no matching messages
     mock_query = Mock()
     mock_query.stream.return_value = []
+    mock_db = Mock()
     mock_db.collection.return_value.where.return_value = mock_query
+    mock_get_db.return_value = mock_db
     
     seoul_tz = pytz.timezone("Asia/Seoul")
     mock_now = datetime(2026, 3, 3, 10, 0, 0)  # Different time

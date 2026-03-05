@@ -50,3 +50,24 @@ def mock_firestore_collection():
     collection.document.return_value = Mock()
     collection.add.return_value = (None, Mock(id="new-doc-id"))
     return collection
+
+
+@pytest.fixture(autouse=True)
+def mock_firestore_client():
+    """Auto-mock Firestore client for all tests to prevent DefaultCredentialsError"""
+    mock_db = Mock()
+    mock_collection = Mock()
+    mock_collection.stream.return_value = []
+    mock_collection.where.return_value = mock_collection
+    mock_collection.order_by.return_value = mock_collection
+    mock_collection.document.return_value = Mock()
+    mock_collection.add.return_value = (None, Mock(id="new-doc-id"))
+    mock_db.collection.return_value = mock_collection
+    
+    # Mock get_db functions and firestore.client to prevent DefaultCredentialsError
+    with patch('routers.webhooks.get_db', return_value=mock_db), \
+         patch('routers.messages.get_db', return_value=mock_db), \
+         patch('scheduler.get_db', return_value=mock_db), \
+         patch('main.get_db', return_value=mock_db), \
+         patch('firebase_admin.firestore.client', return_value=mock_db):
+        yield mock_db

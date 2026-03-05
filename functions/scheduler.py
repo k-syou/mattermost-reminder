@@ -28,6 +28,14 @@ def get_db():
         _db = firestore.client()
     return _db
 
+# For backward compatibility with tests
+class LazyDB:
+    """Lazy wrapper for Firestore client"""
+    def __getattr__(self, name):
+        return getattr(get_db(), name)
+
+db = LazyDB()
+
 # Create router for scheduler endpoint
 scheduler_router = APIRouter()
 
