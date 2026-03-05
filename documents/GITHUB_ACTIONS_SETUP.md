@@ -16,19 +16,19 @@ GitHub Repository Settings → Secrets and variables → Actions에서 다음 se
 
 ### Firebase 배포용
 
-1. **`FIREBASE_TOKEN`**
-   ```bash
-   # 로컬에서 생성
-   firebase login:ci
-   # 출력된 토큰을 복사하여 GitHub Secrets에 추가
-   ```
-
-2. **`FIREBASE_PROJECT_ID`**
-   - Firebase 프로젝트 ID (예: `mattermost-reminder`)
-
-3. **`GCP_SA_KEY`** (선택사항, Google Cloud 인증용)
+1. **`GCP_SA_KEY`** (필수)
    - Google Cloud Service Account JSON 키
    - Firebase Console → Project Settings → Service Accounts에서 생성
+   - "Generate new private key" 클릭하여 JSON 파일 다운로드
+   - JSON 파일 전체 내용을 GitHub Secrets에 추가
+
+2. **`FIREBASE_PROJECT_ID`** (선택사항)
+   - Firebase 프로젝트 ID (예: `mattermost-reminder`)
+   - `.firebaserc` 파일에 이미 설정되어 있으면 불필요
+
+3. **`FIREBASE_TOKEN`** (deprecated)
+   - `firebase login:ci` 명령어로 생성
+   - `--token` 방식이 deprecated 되었으므로 Service Account Key 사용 권장
 
 ### Vercel 배포용
 
