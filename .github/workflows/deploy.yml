@@ -1,11 +1,7 @@
 name: Deploy
 
 on:
-  workflow_dispatch:
-  push:
-    branches:
-      - main
-      - master
+  workflow_dispatch:  # 수동 실행만
 
 jobs:
   deploy-backend:
