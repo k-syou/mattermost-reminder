@@ -171,12 +171,12 @@ async def list_messages(current_user: dict = Depends(get_current_user)):
         raise HTTPException(status_code=500, detail=f"Failed to fetch messages: {str(e)}")
 
 
-@router.get("/send-logs", response_model=List[SendLogResponse])
+@router.get("/send-logs")
 async def list_send_logs(
     current_user: dict = Depends(get_current_user),
     limit: int = 100,
 ):
-    """List recent send logs for the current user (success and error). Returns [] on any error to avoid 500 + missing CORS."""
+    """List recent send logs for the current user. Returns [] on any error; response is plain dicts for CORS/serialization safety."""
     try:
         db_client = get_db()
         query = (
@@ -195,24 +195,20 @@ async def list_send_logs(
             if data.get("userId") != current_user["uid"]:
                 continue
             sent_at = _to_datetime(data.get("sentAt"))
-            status = data.get("status") or "unknown"
-            if status not in ("success", "error"):
-                status = "unknown"
-            logs.append(
-                SendLogResponse(
-                    id=doc.id,
-                    messageId=data.get("messageId") or "",
-                    status=status,
-                    sentAt=sent_at,
-                    error=data.get("error"),
-                    contentPreview=data.get("contentPreview"),
-                )
-            )
+            # Return dict with ISO string to avoid any response_model serialization issues
+            logs.append({
+                "id": doc.id,
+                "messageId": data.get("messageId") or "",
+                "status": data.get("status") if data.get("status") in ("success", "error") else "unknown",
+                "sentAt": sent_at.isoformat() if hasattr(sent_at, "isoformat") else str(sent_at),
+                "error": data.get("error"),
+                "contentPreview": data.get("contentPreview"),
+            })
         except Exception:
             continue
     try:
         logs.sort(
-            key=lambda x: x.sentAt.timestamp() if hasattr(x.sentAt, "timestamp") else 0,
+            key=lambda x: x["sentAt"],
             reverse=True,
         )
     except Exception:
