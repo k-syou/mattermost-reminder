@@ -138,12 +138,28 @@ def api(req: https_fn.Request) -> https_fn.Response:
         return https_fn.Response("", status=204, headers=_cors_headers(req))
 
     # Convert Firebase Request to ASGI scope
+    # ASGI requires headers to be lowercase and in bytes
+    headers = []
+    for key, value in req.headers.items():
+        # Convert header name to lowercase (ASGI spec requirement)
+        headers.append([key.lower().encode(), str(value).encode()])
+    
+    # Get request body - Firebase Functions Request uses get_data() method
+    request_body = b""
+    try:
+        if hasattr(req, "get_data"):
+            request_body = req.get_data(as_text=False)
+        elif hasattr(req, "data"):
+            request_body = req.data if isinstance(req.data, bytes) else str(req.data).encode()
+    except Exception:
+        request_body = b""
+    
     scope = {
         "type": "http",
         "method": req.method,
         "path": req.path,
         "query_string": req.query_string.encode() if req.query_string else b"",
-        "headers": [[k.encode(), v.encode()] for k, v in req.headers.items()],
+        "headers": headers,
         "server": (req.host.split(":")[0] if ":" in req.host else req.host, 443),
         "client": (req.remote_addr, 0) if req.remote_addr else None,
         "scheme": "https",
@@ -151,19 +167,11 @@ def api(req: https_fn.Request) -> https_fn.Response:
 
     # Create ASGI receive function
     body_received = False
-    request_body = b""
 
     async def receive():
-        nonlocal body_received, request_body
+        nonlocal body_received
         if not body_received:
             body_received = True
-            # Get request body
-            if hasattr(req, "get_data"):
-                request_body = req.get_data()
-            elif hasattr(req, "data"):
-                request_body = req.data if isinstance(req.data, bytes) else req.data.encode()
-            else:
-                request_body = b""
             return {"type": "http.request", "body": request_body}
         return {"type": "http.request", "body": b""}
 
