@@ -30,6 +30,8 @@ def mock_user():
     }
 
 
+@patch('routers.messages.get_db')
+@patch('routers.webhooks.get_db')
 @patch('routers.messages.httpx')
 @patch('routers.messages.db')
 @patch('routers.webhooks.db')
@@ -37,11 +39,16 @@ def test_complete_flow(
     mock_webhook_db,
     mock_msg_db,
     mock_httpx,
+    mock_webhooks_get_db,
+    mock_messages_get_db,
     client,
-    mock_user
+    mock_user,
 ):
     """Test complete flow: create webhook -> create message -> send message"""
-    
+    # list_* use get_db(), so return same mocks as db
+    mock_webhooks_get_db.return_value = mock_webhook_db
+    mock_messages_get_db.return_value = mock_msg_db
+
     # Mock webhook creation
     webhook_doc = Mock()
     webhook_doc.id = "webhook-123"
