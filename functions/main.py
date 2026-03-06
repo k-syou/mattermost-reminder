@@ -207,13 +207,29 @@ def api(req: https_fn.Request) -> https_fn.Response:
     # Build response
     status_code = response_status if response_status else 500
     headers = {k.decode(): v.decode() for k, v in response_headers}
-    headers.update(_cors_headers(req))
+    
+    # FastAPI CORSMiddleware already adds CORS headers
+    # Remove any duplicate CORS headers that might have been added
+    # Keep only the first occurrence of each CORS header
+    cors_header_names = ["access-control-allow-origin", "access-control-allow-methods", 
+                         "access-control-allow-headers", "access-control-allow-credentials", "vary"]
+    seen_cors_headers = set()
+    filtered_headers = {}
+    for key, value in headers.items():
+        key_lower = key.lower()
+        if key_lower in cors_header_names:
+            if key_lower not in seen_cors_headers:
+                seen_cors_headers.add(key_lower)
+                filtered_headers[key] = value
+        else:
+            filtered_headers[key] = value
+    
     body = b"".join(response_body_parts)
 
     return https_fn.Response(
         body.decode("utf-8") if isinstance(body, bytes) else body,
         status=status_code,
-        headers=headers
+        headers=filtered_headers
     )
 
 
