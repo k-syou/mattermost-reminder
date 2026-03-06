@@ -61,12 +61,8 @@ def _write_send_log(db, message_id: str, user_id: str, status: str, sent_at, err
         logger.warning("Failed to write send_log: %s", e)
 
 
-@scheduler_router.post("/scheduler/send-messages")
-async def send_scheduled_messages():
-    """
-    Check for messages that should be sent now and send them to Mattermost
-    This endpoint should be called by Cloud Scheduler every minute
-    """
+async def _run_send_scheduled_messages():
+    """Shared logic for POST/GET so Cloud Scheduler or manual trigger can run the same code."""
     db = get_db()
     seoul_tz = pytz.timezone("Asia/Seoul")
     now = datetime.now(seoul_tz)
@@ -167,3 +163,14 @@ async def send_scheduled_messages():
         summary["errors"],
     )
     return summary
+
+
+@scheduler_router.post("/scheduler/send-messages")
+@scheduler_router.get("/scheduler/send-messages")
+async def send_scheduled_messages():
+    """
+    Check for messages that should be sent now and send them to Mattermost.
+    Called by Cloud Scheduler every minute (Cloud Run 배포 시 필수 설정).
+    GET 지원: 브라우저에서 수동 호출/테스트용.
+    """
+    return await _run_send_scheduled_messages()
