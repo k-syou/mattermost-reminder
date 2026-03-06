@@ -187,21 +187,30 @@ async def list_send_logs(
         docs = list(query.stream())
         logs = []
         for doc in docs:
-            data = doc.to_dict() or {}
-            if data.get("userId") != current_user["uid"]:
-                continue
-            logs.append(
-                SendLogResponse(
-                    id=doc.id,
-                    messageId=data.get("messageId", ""),
-                    status=data.get("status", ""),
-                    sentAt=_to_datetime(data.get("sentAt")),
-                    error=data.get("error"),
-                    contentPreview=data.get("contentPreview"),
+            try:
+                data = doc.to_dict() or {}
+                if data.get("userId") != current_user["uid"]:
+                    continue
+                sent_at = _to_datetime(data.get("sentAt"))
+                status = data.get("status") or "unknown"
+                if status not in ("success", "error"):
+                    status = "unknown"
+                logs.append(
+                    SendLogResponse(
+                        id=doc.id,
+                        messageId=data.get("messageId") or "",
+                        status=status,
+                        sentAt=sent_at,
+                        error=data.get("error"),
+                        contentPreview=data.get("contentPreview"),
+                    )
                 )
-            )
-        logs.sort(key=lambda x: x.sentAt.timestamp(), reverse=True)
+            except Exception:
+                continue
+        logs.sort(key=lambda x: x.sentAt.timestamp() if getattr(x.sentAt, "timestamp", None) else 0, reverse=True)
         return logs[:limit]
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Failed to fetch send logs: {str(e)}"

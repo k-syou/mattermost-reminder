@@ -74,13 +74,19 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# CORS middleware
+# CORS: credentials=true requires concrete origins (no "*")
+_CORS_ORIGINS = [
+    "https://mattermost-reminder.vercel.app",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Configure for production
+    allow_origins=_CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 # Import routers (dependencies are imported within routers)
@@ -247,11 +253,13 @@ def api(req: https_fn.Request) -> https_fn.Response:
             filtered_headers[key] = value
     
     body = b"".join(response_body_parts)
+    # Ensure CORS is always present (e.g. on 500 from app)
+    final_headers = {**filtered_headers, **_cors_headers(req)}
 
     return https_fn.Response(
         body.decode("utf-8") if isinstance(body, bytes) else body,
         status=status_code,
-        headers=filtered_headers
+        headers=final_headers
     )
 
 
