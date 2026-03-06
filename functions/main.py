@@ -253,13 +253,11 @@ def api(req: https_fn.Request) -> https_fn.Response:
             filtered_headers[key] = value
     
     body = b"".join(response_body_parts)
-    # Ensure CORS is always present (e.g. on 500 from app)
-    final_headers = {**filtered_headers, **_cors_headers(req)}
-
+    # Use app response headers only (CORSMiddleware already added CORS; merging again duplicates the header)
     return https_fn.Response(
         body.decode("utf-8") if isinstance(body, bytes) else body,
         status=status_code,
-        headers=final_headers
+        headers=filtered_headers
     )
 
 
