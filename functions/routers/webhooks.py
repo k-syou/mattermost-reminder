@@ -50,6 +50,10 @@ def _to_datetime(val: Any) -> datetime:
         return val
     if hasattr(val, "timestamp"):
         return datetime.fromtimestamp(val.timestamp(), tz=timezone.utc)
+    # google.cloud.firestore_v1.types.Timestamp uses .seconds + .nanoseconds
+    if hasattr(val, "seconds"):
+        secs = val.seconds + getattr(val, "nanoseconds", 0) / 1e9
+        return datetime.fromtimestamp(secs, tz=timezone.utc)
     return datetime.fromtimestamp(0, tz=timezone.utc)
 
 
@@ -92,39 +96,27 @@ async def list_webhooks(current_user: dict = Depends(get_current_user)):
     """Get all webhooks for the current user"""
     try:
         db_client = get_db()
-        webhooks_ref = db_client.collection("webhooks")
-        query = webhooks_ref.where("userId", "==", current_user["uid"])
-        
-        # Try to order by createdAt, but fallback if index is missing
-        try:
-            query = query.order_by("createdAt")
-        except Exception:
-            # If order_by fails (missing index), continue without ordering
-            pass
-        
+        query = db_client.collection("webhooks").where(
+            "userId", "==", current_user["uid"]
+        )
         docs = query.stream()
         webhooks = []
-        
         for doc in docs:
-            doc_data = doc.to_dict()
+            doc_data = doc.to_dict() or {}
             webhooks.append(
                 WebhookResponse(
                     id=doc.id,
-                    userId=doc_data["userId"],
-                    alias=doc_data["alias"],
-                    url=doc_data["url"],
+                    userId=doc_data.get("userId", ""),
+                    alias=doc_data.get("alias", ""),
+                    url=doc_data.get("url", ""),
                     createdAt=_to_datetime(doc_data.get("createdAt")),
                     updatedAt=_to_datetime(doc_data.get("updatedAt")),
                 )
             )
-        
-        # Sort in Python if order_by failed
-        if len(webhooks) > 0:
-            webhooks.sort(
-                key=lambda x: x.createdAt.timestamp() if x.createdAt else 0,
-                reverse=True,
-            )
-        
+        webhooks.sort(
+            key=lambda x: x.createdAt.timestamp() if x.createdAt else 0,
+            reverse=True,
+        )
         return webhooks
     except Exception as e:
         import traceback
