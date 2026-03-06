@@ -194,12 +194,29 @@ def api(req: https_fn.Request) -> https_fn.Response:
         asyncio.set_event_loop(loop)
         try:
             loop.run_until_complete(app(scope, receive, send))
+        except Exception as e:
+            # Log the error for debugging
+            import traceback
+            error_trace = traceback.format_exc()
+            print(f"ASGI execution error: {str(e)}")
+            print(f"Traceback: {error_trace}")
+            # If ASGI execution fails, return error response
+            return https_fn.Response(
+                f'{{"error": "Internal server error: {str(e)}", "detail": "{error_trace}"}}',
+                status=500,
+                headers={**{"Content-Type": "application/json"}, **_cors_headers(req)}
+            )
         finally:
             loop.close()
     except Exception as e:
+        # Log the error for debugging
+        import traceback
+        error_trace = traceback.format_exc()
+        print(f"ASGI setup error: {str(e)}")
+        print(f"Traceback: {error_trace}")
         # If ASGI execution fails, return error response
         return https_fn.Response(
-            f'{{"error": "Internal server error: {str(e)}"}}',
+            f'{{"error": "Internal server error: {str(e)}", "detail": "{error_trace}"}}',
             status=500,
             headers={**{"Content-Type": "application/json"}, **_cors_headers(req)}
         )

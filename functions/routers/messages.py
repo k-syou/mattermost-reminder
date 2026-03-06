@@ -95,8 +95,16 @@ async def create_message(
 async def list_messages(current_user: dict = Depends(get_current_user)):
     """Get all messages for the current user"""
     try:
-        messages_ref = db.collection("messages")
-        query = messages_ref.where("userId", "==", current_user["uid"]).order_by("createdAt")
+        db_client = get_db()
+        messages_ref = db_client.collection("messages")
+        query = messages_ref.where("userId", "==", current_user["uid"])
+        
+        # Try to order by createdAt, but fallback if index is missing
+        try:
+            query = query.order_by("createdAt")
+        except Exception:
+            # If order_by fails (missing index), continue without ordering
+            pass
         
         docs = query.stream()
         messages = []
@@ -115,8 +123,16 @@ async def list_messages(current_user: dict = Depends(get_current_user)):
                 updatedAt=doc_data["updatedAt"]
             ))
         
+        # Sort in Python if order_by failed
+        if len(messages) > 0 and hasattr(messages[0], "createdAt"):
+            messages.sort(key=lambda x: x.createdAt if x.createdAt else 0, reverse=True)
+        
         return messages
     except Exception as e:
+        import traceback
+        error_trace = traceback.format_exc()
+        print(f"Error in list_messages: {str(e)}")
+        print(f"Traceback: {error_trace}")
         raise HTTPException(status_code=500, detail=f"Failed to fetch messages: {str(e)}")
 
 

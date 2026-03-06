@@ -47,8 +47,8 @@ def mock_webhook_data():
     }
 
 
-@patch('routers.webhooks.db')
-def test_create_webhook(mock_db, client, mock_webhook_data):
+@patch('routers.webhooks.get_db')
+def test_create_webhook(mock_get_db, client, mock_webhook_data):
     """Test webhook creation"""
     
     # Mock Firestore
@@ -60,7 +60,10 @@ def test_create_webhook(mock_db, client, mock_webhook_data):
     mock_collection = Mock()
     mock_collection.add.return_value = (None, Mock(id="webhook-123"))
     mock_collection.document.return_value = mock_doc
+    
+    mock_db = Mock()
     mock_db.collection.return_value = mock_collection
+    mock_get_db.return_value = mock_db
     
     response = client.post(
         "/api/webhooks",
@@ -77,8 +80,8 @@ def test_create_webhook(mock_db, client, mock_webhook_data):
     assert data["url"] == "https://mattermost.example.com/hooks/abc123"
 
 
-@patch('routers.webhooks.db')
-def test_list_webhooks(mock_db, client, mock_webhook_data):
+@patch('routers.webhooks.get_db')
+def test_list_webhooks(mock_get_db, client, mock_webhook_data):
     """Test webhook listing"""
     
     # Mock Firestore query
@@ -91,7 +94,12 @@ def test_list_webhooks(mock_db, client, mock_webhook_data):
     mock_query.where.return_value = mock_query
     mock_query.order_by.return_value = mock_query
     
-    mock_db.collection.return_value.where.return_value = mock_query
+    mock_collection = Mock()
+    mock_collection.where.return_value = mock_query
+    
+    mock_db = Mock()
+    mock_db.collection.return_value = mock_collection
+    mock_get_db.return_value = mock_db
     
     response = client.get(
         "/api/webhooks",

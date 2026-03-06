@@ -46,8 +46,8 @@ def mock_message_data():
     }
 
 
-@patch('routers.messages.db')
-def test_create_message(mock_db, client, mock_message_data):
+@patch('routers.messages.get_db')
+def test_create_message(mock_get_db, client, mock_message_data):
     """Test message creation"""
     
     # Mock Firestore
@@ -59,7 +59,10 @@ def test_create_message(mock_db, client, mock_message_data):
     mock_collection = Mock()
     mock_collection.add.return_value = (None, Mock(id="message-123"))
     mock_collection.document.return_value = mock_doc
+    
+    mock_db = Mock()
     mock_db.collection.return_value = mock_collection
+    mock_get_db.return_value = mock_db
     
     response = client.post(
         "/api/messages",
@@ -80,8 +83,8 @@ def test_create_message(mock_db, client, mock_message_data):
     assert data["sendTime"] == "09:00"
 
 
-@patch('routers.messages.db')
-def test_create_message_invalid_days(mock_db, client):
+@patch('routers.messages.get_db')
+def test_create_message_invalid_days(mock_get_db, client):
     """Test message creation with invalid days"""
     
     response = client.post(
@@ -99,8 +102,8 @@ def test_create_message_invalid_days(mock_db, client):
 
 
 @patch('routers.messages.httpx')
-@patch('routers.messages.db')
-def test_send_message_now(mock_db, mock_httpx, client, mock_message_data):
+@patch('routers.messages.get_db')
+def test_send_message_now(mock_get_db, mock_httpx, client, mock_message_data):
     """Test immediate message sending"""
     
     # Mock Firestore
@@ -109,7 +112,12 @@ def test_send_message_now(mock_db, mock_httpx, client, mock_message_data):
     mock_doc.to_dict.return_value = mock_message_data
     mock_doc.get.return_value = mock_doc
     
-    mock_db.collection.return_value.document.return_value = mock_doc
+    mock_collection = Mock()
+    mock_collection.document.return_value = mock_doc
+    
+    mock_db = Mock()
+    mock_db.collection.return_value = mock_collection
+    mock_get_db.return_value = mock_db
     
     # Mock HTTP request (async)
     from unittest.mock import AsyncMock

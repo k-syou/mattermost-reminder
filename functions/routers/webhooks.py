@@ -80,8 +80,16 @@ async def create_webhook(
 async def list_webhooks(current_user: dict = Depends(get_current_user)):
     """Get all webhooks for the current user"""
     try:
-        webhooks_ref = db.collection("webhooks")
-        query = webhooks_ref.where("userId", "==", current_user["uid"]).order_by("createdAt")
+        db_client = get_db()
+        webhooks_ref = db_client.collection("webhooks")
+        query = webhooks_ref.where("userId", "==", current_user["uid"])
+        
+        # Try to order by createdAt, but fallback if index is missing
+        try:
+            query = query.order_by("createdAt")
+        except Exception:
+            # If order_by fails (missing index), continue without ordering
+            pass
         
         docs = query.stream()
         webhooks = []
@@ -97,8 +105,16 @@ async def list_webhooks(current_user: dict = Depends(get_current_user)):
                 updatedAt=doc_data["updatedAt"]
             ))
         
+        # Sort in Python if order_by failed
+        if len(webhooks) > 0 and hasattr(webhooks[0], "createdAt"):
+            webhooks.sort(key=lambda x: x.createdAt if x.createdAt else 0, reverse=True)
+        
         return webhooks
     except Exception as e:
+        import traceback
+        error_trace = traceback.format_exc()
+        print(f"Error in list_webhooks: {str(e)}")
+        print(f"Traceback: {error_trace}")
         raise HTTPException(status_code=500, detail=f"Failed to fetch webhooks: {str(e)}")
 
 
