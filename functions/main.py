@@ -10,7 +10,7 @@ from firebase_functions import https_fn, scheduler_fn
 from datetime import datetime
 import httpx
 import pytz
-from a2wsgi import ASGIMiddleware
+import asyncio
 
 load_dotenv()
 
@@ -113,7 +113,6 @@ async def health():
 
 
 # Firebase Functions - must be defined in main.py for discovery
-_wsgi_app = ASGIMiddleware(app)
 
 
 def _cors_headers(req: https_fn.Request) -> dict:
@@ -138,30 +137,76 @@ def api(req: https_fn.Request) -> https_fn.Response:
     if req.method == "OPTIONS":
         return https_fn.Response("", status=204, headers=_cors_headers(req))
 
-    status_line = "500 INTERNAL SERVER ERROR"
+    # Convert Firebase Request to ASGI scope
+    scope = {
+        "type": "http",
+        "method": req.method,
+        "path": req.path,
+        "query_string": req.query_string.encode() if req.query_string else b"",
+        "headers": [[k.encode(), v.encode()] for k, v in req.headers.items()],
+        "server": (req.host.split(":")[0] if ":" in req.host else req.host, 443),
+        "client": (req.remote_addr, 0) if req.remote_addr else None,
+        "scheme": "https",
+    }
+
+    # Create ASGI receive function
+    body_received = False
+    request_body = b""
+
+    async def receive():
+        nonlocal body_received, request_body
+        if not body_received:
+            body_received = True
+            # Get request body
+            if hasattr(req, "get_data"):
+                request_body = req.get_data()
+            elif hasattr(req, "data"):
+                request_body = req.data if isinstance(req.data, bytes) else req.data.encode()
+            else:
+                request_body = b""
+            return {"type": "http.request", "body": request_body}
+        return {"type": "http.request", "body": b""}
+
+    # Create ASGI send function
+    response_status = None
     response_headers = []
+    response_body_parts = []
 
-    def start_response(status, headers, exc_info=None):
-        nonlocal status_line, response_headers
-        status_line = status
-        response_headers = headers
+    async def send(message):
+        nonlocal response_status, response_headers, response_body_parts
+        if message["type"] == "http.response.start":
+            response_status = message["status"]
+            response_headers = message["headers"]
+        elif message["type"] == "http.response.body":
+            response_body_parts.append(message.get("body", b""))
 
-    result_iter = _wsgi_app(req.environ, start_response)
+    # Run ASGI app
     try:
-        body = b"".join(result_iter)
-    finally:
-        if hasattr(result_iter, "close"):
-            result_iter.close()
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            loop.run_until_complete(app(scope, receive, send))
+        finally:
+            loop.close()
+    except Exception as e:
+        # If ASGI execution fails, return error response
+        return https_fn.Response(
+            f'{{"error": "Internal server error: {str(e)}"}}',
+            status=500,
+            headers={**{"Content-Type": "application/json"}, **_cors_headers(req)}
+        )
 
-    try:
-        status_code = int(status_line.split(" ", 1)[0])
-    except Exception:
-        status_code = 500
-
-    headers = {k: v for (k, v) in response_headers}
+    # Build response
+    status_code = response_status if response_status else 500
+    headers = {k.decode(): v.decode() for k, v in response_headers}
     headers.update(_cors_headers(req))
+    body = b"".join(response_body_parts)
 
-    return https_fn.Response(body, status=status_code, headers=headers)
+    return https_fn.Response(
+        body.decode("utf-8") if isinstance(body, bytes) else body,
+        status=status_code,
+        headers=headers
+    )
 
 
 # Lazy initialization of Firestore client for scheduled function
