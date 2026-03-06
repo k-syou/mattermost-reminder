@@ -89,13 +89,15 @@ if functions_dir not in sys.path:
     sys.path.insert(0, functions_dir)
 
 from routers import webhooks, messages
+from scheduler import scheduler_router
 
 # Include routers
 app.include_router(webhooks.router, prefix="/api/webhooks", tags=["webhooks"])
 app.include_router(messages.router, prefix="/api/messages", tags=["messages"])
+app.include_router(scheduler_router)  # POST /scheduler/send-messages (for Cloud Run + Cloud Scheduler)
 
-# Note: Scheduler endpoint is available at /scheduler/send-messages
-# but for Firebase Functions, we use scheduled_function.py instead
+# Firebase: on_schedule in main.py also runs send_scheduled_messages every minute (Asia/Seoul).
+# If using Cloud Run only, create a Cloud Scheduler job to POST this URL every minute.
 
 
 @app.get("/")
@@ -277,7 +279,8 @@ def send_scheduled_messages(event: scheduler_fn.ScheduledEvent) -> None:
     # Get current time in Asia/Seoul timezone
     seoul_tz = pytz.timezone("Asia/Seoul")
     now = datetime.now(seoul_tz)
-    current_day = now.weekday()  # 0=Monday, 6=Sunday
+    # API/frontend: 0=Sunday, 1=Monday, ..., 6=Saturday. Python weekday(): 0=Mon, 6=Sun.
+    current_day = (now.weekday() + 1) % 7  # 0=Sun, 6=Sat to match API
     current_time = now.strftime("%H:%M")
     
     # Query active messages

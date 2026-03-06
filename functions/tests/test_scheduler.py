@@ -18,7 +18,7 @@ async def test_send_scheduled_messages_success(mock_httpx, mock_get_db):
     mock_now = datetime(2026, 3, 3, 9, 0, 0)  # Monday
     mock_now = seoul_tz.localize(mock_now)
     
-    # Mock Firestore documents
+    # Mock Firestore documents. API: 0=Sun, 1=Mon, ..., 6=Sat.
     mock_doc1 = Mock()
     mock_doc1.id = "msg-1"
     mock_doc1.to_dict.return_value = {
@@ -32,7 +32,7 @@ async def test_send_scheduled_messages_success(mock_httpx, mock_get_db):
     mock_doc2 = Mock()
     mock_doc2.id = "msg-2"
     mock_doc2.to_dict.return_value = {
-        "daysOfWeek": [0],  # Monday (0=Monday in weekday())
+        "daysOfWeek": [1],  # Monday (matches mock_now Monday 09:00)
         "sendTime": "09:00",
         "content": "Monday message",
         "webhookUrl": "https://example.com/webhook2",

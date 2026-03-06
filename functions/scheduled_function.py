@@ -41,7 +41,8 @@ def send_scheduled_messages(event: scheduler_fn.ScheduledEvent) -> None:
     # Get current time in Asia/Seoul timezone
     seoul_tz = pytz.timezone("Asia/Seoul")
     now = datetime.now(seoul_tz)
-    current_day = now.weekday()  # 0=Monday, 6=Sunday
+    # API/frontend: 0=Sunday, 1=Monday, ..., 6=Saturday. Python weekday(): 0=Mon, 6=Sun.
+    current_day = (now.weekday() + 1) % 7  # 0=Sun, 6=Sat to match API
     current_time = now.strftime("%H:%M")
     
     # Query active messages
