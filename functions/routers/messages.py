@@ -176,7 +176,7 @@ async def list_send_logs(
     current_user: dict = Depends(get_current_user),
     limit: int = 100,
 ):
-    """List recent send logs for the current user (success and error)."""
+    """List recent send logs for the current user (success and error). Returns [] on any error to avoid 500 + missing CORS."""
     try:
         db_client = get_db()
         query = (
@@ -185,36 +185,39 @@ async def list_send_logs(
             .limit(500)
         )
         docs = list(query.stream())
-        logs = []
-        for doc in docs:
-            try:
-                data = doc.to_dict() or {}
-                if data.get("userId") != current_user["uid"]:
-                    continue
-                sent_at = _to_datetime(data.get("sentAt"))
-                status = data.get("status") or "unknown"
-                if status not in ("success", "error"):
-                    status = "unknown"
-                logs.append(
-                    SendLogResponse(
-                        id=doc.id,
-                        messageId=data.get("messageId") or "",
-                        status=status,
-                        sentAt=sent_at,
-                        error=data.get("error"),
-                        contentPreview=data.get("contentPreview"),
-                    )
-                )
-            except Exception:
+    except Exception:
+        return []
+
+    logs = []
+    for doc in docs:
+        try:
+            data = doc.to_dict() or {}
+            if data.get("userId") != current_user["uid"]:
                 continue
-        logs.sort(key=lambda x: x.sentAt.timestamp() if getattr(x.sentAt, "timestamp", None) else 0, reverse=True)
-        return logs[:limit]
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to fetch send logs: {str(e)}"
+            sent_at = _to_datetime(data.get("sentAt"))
+            status = data.get("status") or "unknown"
+            if status not in ("success", "error"):
+                status = "unknown"
+            logs.append(
+                SendLogResponse(
+                    id=doc.id,
+                    messageId=data.get("messageId") or "",
+                    status=status,
+                    sentAt=sent_at,
+                    error=data.get("error"),
+                    contentPreview=data.get("contentPreview"),
+                )
+            )
+        except Exception:
+            continue
+    try:
+        logs.sort(
+            key=lambda x: x.sentAt.timestamp() if hasattr(x.sentAt, "timestamp") else 0,
+            reverse=True,
         )
+    except Exception:
+        pass
+    return logs[:limit]
 
 
 @router.get("/{message_id}", response_model=MessageResponse)

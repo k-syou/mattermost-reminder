@@ -253,7 +253,9 @@ def api(req: https_fn.Request) -> https_fn.Response:
             filtered_headers[key] = value
     
     body = b"".join(response_body_parts)
-    # Use app response headers only (CORSMiddleware already added CORS; merging again duplicates the header)
+    # On 5xx, ensure CORS is present (app error path may not have it)
+    if status_code >= 500 and "access-control-allow-origin" not in {k.lower() for k in filtered_headers}:
+        filtered_headers = {**filtered_headers, **_cors_headers(req)}
     return https_fn.Response(
         body.decode("utf-8") if isinstance(body, bytes) else body,
         status=status_code,
