@@ -3,8 +3,8 @@ Webhook CRUD API endpoints
 """
 from fastapi import APIRouter, HTTPException, Depends
 from firebase_admin import firestore
-from typing import List
-from datetime import datetime
+from typing import List, Any
+from datetime import datetime, timezone
 
 from dependencies import get_current_user
 from models import WebhookCreate, WebhookUpdate, WebhookResponse
@@ -42,6 +42,17 @@ class LazyDB:
 db = LazyDB()
 
 
+def _to_datetime(val: Any) -> datetime:
+    """Convert Firestore Timestamp to Python datetime for JSON serialization."""
+    if val is None:
+        return datetime.fromtimestamp(0, tz=timezone.utc)
+    if isinstance(val, datetime):
+        return val
+    if hasattr(val, "timestamp"):
+        return datetime.fromtimestamp(val.timestamp(), tz=timezone.utc)
+    return datetime.fromtimestamp(0, tz=timezone.utc)
+
+
 @router.post("", response_model=WebhookResponse, status_code=201)
 async def create_webhook(
     webhook: WebhookCreate,
@@ -69,8 +80,8 @@ async def create_webhook(
             userId=doc_data["userId"],
             alias=doc_data["alias"],
             url=doc_data["url"],
-            createdAt=doc_data["createdAt"],
-            updatedAt=doc_data["updatedAt"]
+            createdAt=_to_datetime(doc_data["createdAt"]),
+            updatedAt=_to_datetime(doc_data["updatedAt"]),
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to create webhook: {str(e)}")
@@ -96,18 +107,23 @@ async def list_webhooks(current_user: dict = Depends(get_current_user)):
         
         for doc in docs:
             doc_data = doc.to_dict()
-            webhooks.append(WebhookResponse(
-                id=doc.id,
-                userId=doc_data["userId"],
-                alias=doc_data["alias"],
-                url=doc_data["url"],
-                createdAt=doc_data["createdAt"],
-                updatedAt=doc_data["updatedAt"]
-            ))
+            webhooks.append(
+                WebhookResponse(
+                    id=doc.id,
+                    userId=doc_data["userId"],
+                    alias=doc_data["alias"],
+                    url=doc_data["url"],
+                    createdAt=_to_datetime(doc_data.get("createdAt")),
+                    updatedAt=_to_datetime(doc_data.get("updatedAt")),
+                )
+            )
         
         # Sort in Python if order_by failed
-        if len(webhooks) > 0 and hasattr(webhooks[0], "createdAt"):
-            webhooks.sort(key=lambda x: x.createdAt if x.createdAt else 0, reverse=True)
+        if len(webhooks) > 0:
+            webhooks.sort(
+                key=lambda x: x.createdAt.timestamp() if x.createdAt else 0,
+                reverse=True,
+            )
         
         return webhooks
     except Exception as e:
@@ -142,8 +158,8 @@ async def get_webhook(
             userId=doc_data["userId"],
             alias=doc_data["alias"],
             url=doc_data["url"],
-            createdAt=doc_data["createdAt"],
-            updatedAt=doc_data["updatedAt"]
+            createdAt=_to_datetime(doc_data["createdAt"]),
+            updatedAt=_to_datetime(doc_data["updatedAt"]),
         )
     except HTTPException:
         raise
@@ -189,8 +205,8 @@ async def update_webhook(
             userId=updated_data["userId"],
             alias=updated_data["alias"],
             url=updated_data["url"],
-            createdAt=updated_data["createdAt"],
-            updatedAt=updated_data["updatedAt"]
+            createdAt=_to_datetime(updated_data["createdAt"]),
+            updatedAt=_to_datetime(updated_data["updatedAt"]),
         )
     except HTTPException:
         raise
