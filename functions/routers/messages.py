@@ -3,7 +3,8 @@ Message CRUD API endpoints
 """
 from fastapi import APIRouter, HTTPException, Depends
 from firebase_admin import firestore
-from typing import List
+from typing import List, Any
+from datetime import datetime, timezone
 import httpx
 
 from dependencies import get_current_user
@@ -40,6 +41,20 @@ class LazyDB:
             return []
 
 db = LazyDB()
+
+
+def _to_datetime(val: Any) -> datetime:
+    """Convert Firestore Timestamp to Python datetime for JSON serialization."""
+    if val is None:
+        return datetime.fromtimestamp(0, tz=timezone.utc)
+    if isinstance(val, datetime):
+        return val
+    if hasattr(val, "timestamp"):
+        return datetime.fromtimestamp(val.timestamp(), tz=timezone.utc)
+    if hasattr(val, "seconds"):
+        secs = val.seconds + getattr(val, "nanoseconds", 0) / 1e9
+        return datetime.fromtimestamp(secs, tz=timezone.utc)
+    return datetime.fromtimestamp(0, tz=timezone.utc)
 
 
 @router.post("", response_model=MessageResponse, status_code=201)
@@ -82,8 +97,8 @@ async def create_message(
             sendTime=doc_data["sendTime"],
             webhookUrl=doc_data["webhookUrl"],
             isActive=doc_data["isActive"],
-            createdAt=doc_data["createdAt"],
-            updatedAt=doc_data["updatedAt"]
+            createdAt=_to_datetime(doc_data["createdAt"]),
+            updatedAt=_to_datetime(doc_data["updatedAt"]),
         )
     except HTTPException:
         raise
@@ -96,37 +111,30 @@ async def list_messages(current_user: dict = Depends(get_current_user)):
     """Get all messages for the current user"""
     try:
         db_client = get_db()
-        messages_ref = db_client.collection("messages")
-        query = messages_ref.where("userId", "==", current_user["uid"])
-        
-        # Try to order by createdAt, but fallback if index is missing
-        try:
-            query = query.order_by("createdAt")
-        except Exception:
-            # If order_by fails (missing index), continue without ordering
-            pass
-        
+        query = db_client.collection("messages").where(
+            "userId", "==", current_user["uid"]
+        )
         docs = query.stream()
         messages = []
-        
         for doc in docs:
-            doc_data = doc.to_dict()
-            messages.append(MessageResponse(
-                id=doc.id,
-                userId=doc_data["userId"],
-                content=doc_data["content"],
-                daysOfWeek=doc_data["daysOfWeek"],
-                sendTime=doc_data["sendTime"],
-                webhookUrl=doc_data["webhookUrl"],
-                isActive=doc_data["isActive"],
-                createdAt=doc_data["createdAt"],
-                updatedAt=doc_data["updatedAt"]
-            ))
-        
-        # Sort in Python if order_by failed
-        if len(messages) > 0 and hasattr(messages[0], "createdAt"):
-            messages.sort(key=lambda x: x.createdAt if x.createdAt else 0, reverse=True)
-        
+            doc_data = doc.to_dict() or {}
+            messages.append(
+                MessageResponse(
+                    id=doc.id,
+                    userId=doc_data.get("userId", ""),
+                    content=doc_data.get("content", ""),
+                    daysOfWeek=doc_data.get("daysOfWeek", []),
+                    sendTime=doc_data.get("sendTime", ""),
+                    webhookUrl=doc_data.get("webhookUrl", ""),
+                    isActive=doc_data.get("isActive", True),
+                    createdAt=_to_datetime(doc_data.get("createdAt")),
+                    updatedAt=_to_datetime(doc_data.get("updatedAt")),
+                )
+            )
+        messages.sort(
+            key=lambda x: x.createdAt.timestamp() if x.createdAt else 0,
+            reverse=True,
+        )
         return messages
     except Exception as e:
         import traceback
@@ -163,8 +171,8 @@ async def get_message(
             sendTime=doc_data["sendTime"],
             webhookUrl=doc_data["webhookUrl"],
             isActive=doc_data["isActive"],
-            createdAt=doc_data["createdAt"],
-            updatedAt=doc_data["updatedAt"]
+            createdAt=_to_datetime(doc_data["createdAt"]),
+            updatedAt=_to_datetime(doc_data["updatedAt"]),
         )
     except HTTPException:
         raise
@@ -227,8 +235,8 @@ async def update_message(
             sendTime=updated_data["sendTime"],
             webhookUrl=updated_data["webhookUrl"],
             isActive=updated_data["isActive"],
-            createdAt=updated_data["createdAt"],
-            updatedAt=updated_data["updatedAt"]
+            createdAt=_to_datetime(updated_data["createdAt"]),
+            updatedAt=_to_datetime(updated_data["updatedAt"]),
         )
     except HTTPException:
         raise
