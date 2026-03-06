@@ -51,3 +51,12 @@ class MessageResponse(BaseModel):
     isActive: bool
     createdAt: datetime
     updatedAt: datetime
+
+
+class SendLogResponse(BaseModel):
+    id: str
+    messageId: str
+    status: str  # success | error
+    sentAt: datetime
+    error: Optional[str] = None
+    contentPreview: Optional[str] = None

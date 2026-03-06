@@ -1,12 +1,13 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { useAuthStore } from './auth'
-import type { Message } from '@/types/message'
+import type { Message, SendLog } from '@/types/message'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || ''
 
 export const useMessageStore = defineStore('message', () => {
   const messages = ref<Message[]>([])
+  const sendLogs = ref<SendLog[]>([])
   const loading = ref(false)
   const error = ref<string | null>(null)
 
@@ -146,7 +147,9 @@ export const useMessageStore = defineStore('message', () => {
       })
 
       if (!response.ok) throw new Error('메시지 전송에 실패했습니다.')
-      return await response.json()
+      const result = await response.json()
+      await fetchSendLogs()
+      return result
     } catch (err: any) {
       error.value = err.message
       throw err
@@ -155,14 +158,34 @@ export const useMessageStore = defineStore('message', () => {
     }
   }
 
+  const fetchSendLogs = async (limit = 100) => {
+    try {
+      const token = await authStore.getIdToken()
+      if (!token) return
+
+      const response = await fetch(
+        `${API_BASE_URL}/api/messages/send-logs?limit=${limit}`,
+        {
+          headers: { 'Authorization': `Bearer ${token}` }
+        }
+      )
+      if (!response.ok) return
+      sendLogs.value = await response.json()
+    } catch {
+      sendLogs.value = []
+    }
+  }
+
   return {
     messages,
+    sendLogs,
     loading,
     error,
     fetchMessages,
     createMessage,
     updateMessage,
     deleteMessage,
-    sendMessageNow
+    sendMessageNow,
+    fetchSendLogs
   }
 })

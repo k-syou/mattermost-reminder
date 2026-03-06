@@ -25,3 +25,12 @@ export interface MessageUpdate {
   webhookUrl?: string
   isActive?: boolean
 }
+
+export interface SendLog {
+  id: string
+  messageId: string
+  status: 'success' | 'error'
+  sentAt: string
+  error?: string
+  contentPreview?: string
+}

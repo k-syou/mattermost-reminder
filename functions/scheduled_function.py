@@ -2,11 +2,14 @@
 Firebase Scheduled Function for sending scheduled messages
 This function runs every minute via Cloud Scheduler
 """
+import logging
 from firebase_functions import scheduler_fn
 from firebase_admin import initialize_app, firestore
 from datetime import datetime
 import httpx
 import pytz
+
+logger = logging.getLogger(__name__)
 
 # Initialize Firebase Admin (if not already initialized)
 try:
@@ -25,6 +28,24 @@ def get_db():
     return _db
 
 
+def _write_send_log(db, message_id: str, user_id: str, status: str, sent_at, error: str = None, content_preview: str = None):
+    try:
+        doc = {
+            "messageId": message_id,
+            "userId": user_id,
+            "status": status,
+            "sentAt": sent_at,
+            "createdAt": firestore.SERVER_TIMESTAMP,
+        }
+        if error:
+            doc["error"] = str(error)[:500]
+        if content_preview is not None:
+            doc["contentPreview"] = (content_preview or "")[:200]
+        db.collection("send_logs").add(doc)
+    except Exception as e:
+        logger.warning("Failed to write send_log: %s", e)
+
+
 @scheduler_fn.on_schedule(
     schedule="every 1 minutes",
     timezone="Asia/Seoul",
@@ -35,37 +56,40 @@ def send_scheduled_messages(event: scheduler_fn.ScheduledEvent) -> None:
     Check for messages that should be sent now and send them to Mattermost
     This function is triggered by Cloud Scheduler every minute
     """
-    # Get Firestore client (lazy initialization)
     db = get_db()
-    
-    # Get current time in Asia/Seoul timezone
     seoul_tz = pytz.timezone("Asia/Seoul")
     now = datetime.now(seoul_tz)
-    # API/frontend: 0=Sunday, 1=Monday, ..., 6=Saturday. Python weekday(): 0=Mon, 6=Sun.
-    current_day = (now.weekday() + 1) % 7  # 0=Sun, 6=Sat to match API
+    current_day = (now.weekday() + 1) % 7
     current_time = now.strftime("%H:%M")
-    
-    # Query active messages
+
+    logger.info("Scheduler run at %s (day=%s, time=%s)", now.isoformat(), current_day, current_time)
+
     messages_ref = db.collection("messages")
     query = messages_ref.where("isActive", "==", True)
-    
     messages_to_send = []
+    all_active = 0
     for doc in query.stream():
-        data = doc.to_dict()
+        all_active += 1
+        data = doc.to_dict() or {}
         days_of_week = data.get("daysOfWeek", [])
         send_time = data.get("sendTime", "")
-        
-        # Check if current day matches and time matches
-        if current_day in days_of_week and send_time == current_time:
+        user_id = data.get("userId", "")
+        matched = current_day in days_of_week and send_time == current_time
+        logger.info("  message %s: daysOfWeek=%s sendTime=%s -> match=%s", doc.id, days_of_week, send_time, matched)
+        if matched:
             messages_to_send.append({
                 "id": doc.id,
+                "userId": user_id,
                 "content": data.get("content", ""),
-                "webhookUrl": data.get("webhookUrl", "")
+                "webhookUrl": data.get("webhookUrl", ""),
             })
-    
-    # Send messages
+
+    logger.info("Active messages=%s, matched for send=%s", all_active, len(messages_to_send))
+
     results = []
     for message in messages_to_send:
+        content_preview = (message["content"] or "")[:200]
+        sent_at = datetime.now(seoul_tz)
         try:
             response = httpx.post(
                 message["webhookUrl"],
@@ -73,17 +97,12 @@ def send_scheduled_messages(event: scheduler_fn.ScheduledEvent) -> None:
                 timeout=10.0
             )
             response.raise_for_status()
-            results.append({
-                "id": message["id"],
-                "status": "success",
-                "sentAt": datetime.now(seoul_tz).isoformat()
-            })
+            results.append({"id": message["id"], "status": "success", "sentAt": sent_at.isoformat()})
+            _write_send_log(db, message["id"], message["userId"], "success", sent_at, content_preview=content_preview)
+            logger.info("  sent messageId=%s success", message["id"])
         except Exception as e:
-            results.append({
-                "id": message["id"],
-                "status": "error",
-                "error": str(e),
-                "sentAt": datetime.now(seoul_tz).isoformat()
-            })
-    
-    print(f"Processed {len(results)} messages: {sum(1 for r in results if r['status'] == 'success')} success, {sum(1 for r in results if r['status'] == 'error')} errors")
+            results.append({"id": message["id"], "status": "error", "error": str(e), "sentAt": sent_at.isoformat()})
+            _write_send_log(db, message["id"], message["userId"], "error", sent_at, error=str(e), content_preview=content_preview)
+            logger.warning("  send messageId=%s error: %s", message["id"], e)
+
+    logger.info("Scheduler done: processed=%s success=%s errors=%s", len(results), sum(1 for r in results if r["status"] == "success"), sum(1 for r in results if r["status"] == "error"))

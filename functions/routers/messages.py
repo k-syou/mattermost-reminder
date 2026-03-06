@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 import httpx
 
 from dependencies import get_current_user
-from models import MessageCreate, MessageUpdate, MessageResponse
+from models import MessageCreate, MessageUpdate, MessageResponse, SendLogResponse
 
 router = APIRouter()
 
@@ -41,6 +41,33 @@ class LazyDB:
             return []
 
 db = LazyDB()
+
+
+def _write_send_log(
+    message_id: str,
+    user_id: str,
+    status: str,
+    error: str = None,
+    content_preview: str = None,
+):
+    """Append one send attempt to send_logs collection."""
+    try:
+        db_client = get_db()
+        now = datetime.now(timezone.utc)
+        doc = {
+            "messageId": message_id,
+            "userId": user_id,
+            "status": status,
+            "sentAt": now,
+            "createdAt": firestore.SERVER_TIMESTAMP,
+        }
+        if error:
+            doc["error"] = str(error)[:500]
+        if content_preview is not None:
+            doc["contentPreview"] = (content_preview or "")[:200]
+        db_client.collection("send_logs").add(doc)
+    except Exception:
+        pass
 
 
 def _to_datetime(val: Any) -> datetime:
@@ -142,6 +169,43 @@ async def list_messages(current_user: dict = Depends(get_current_user)):
         print(f"Error in list_messages: {str(e)}")
         print(f"Traceback: {error_trace}")
         raise HTTPException(status_code=500, detail=f"Failed to fetch messages: {str(e)}")
+
+
+@router.get("/send-logs", response_model=List[SendLogResponse])
+async def list_send_logs(
+    current_user: dict = Depends(get_current_user),
+    limit: int = 100,
+):
+    """List recent send logs for the current user (success and error)."""
+    try:
+        db_client = get_db()
+        query = (
+            db_client.collection("send_logs")
+            .where("userId", "==", current_user["uid"])
+            .limit(500)
+        )
+        docs = list(query.stream())
+        logs = []
+        for doc in docs:
+            data = doc.to_dict() or {}
+            if data.get("userId") != current_user["uid"]:
+                continue
+            logs.append(
+                SendLogResponse(
+                    id=doc.id,
+                    messageId=data.get("messageId", ""),
+                    status=data.get("status", ""),
+                    sentAt=_to_datetime(data.get("sentAt")),
+                    error=data.get("error"),
+                    contentPreview=data.get("contentPreview"),
+                )
+            )
+        logs.sort(key=lambda x: x.sentAt.timestamp(), reverse=True)
+        return logs[:limit]
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Failed to fetch send logs: {str(e)}"
+        )
 
 
 @router.get("/{message_id}", response_model=MessageResponse)
@@ -290,10 +354,11 @@ async def send_message_now(
         if doc_data["userId"] != current_user["uid"]:
             raise HTTPException(status_code=403, detail="Access denied")
         
-        # Send to Mattermost webhook
         webhook_url = doc_data["webhookUrl"]
         content = doc_data["content"]
-        
+        user_id = doc_data["userId"]
+        content_preview = (content or "")[:200]
+
         try:
             async with httpx.AsyncClient() as client:
                 response = await client.post(
@@ -302,13 +367,14 @@ async def send_message_now(
                     timeout=10.0
                 )
                 response.raise_for_status()
-            
+            _write_send_log(message_id, user_id, "success", content_preview=content_preview)
             return {
                 "success": True,
                 "message": "Message sent successfully",
                 "messageId": message_id
             }
         except httpx.HTTPError as e:
+            _write_send_log(message_id, user_id, "error", error=str(e), content_preview=content_preview)
             raise HTTPException(
                 status_code=502,
                 detail=f"Failed to send message to Mattermost: {str(e)}"

@@ -104,6 +104,53 @@
             </li>
           </ul>
         </div>
+
+        <!-- 전송 이력 -->
+        <div v-if="!messageStore.loading" class="mt-8 bg-white shadow overflow-hidden sm:rounded-md">
+          <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+            <h3 class="text-lg font-medium text-gray-900">전송 이력</h3>
+            <button
+              type="button"
+              @click="messageStore.fetchSendLogs()"
+              class="text-sm text-indigo-600 hover:text-indigo-800"
+            >
+              새로고침
+            </button>
+          </div>
+          <div v-if="messageStore.sendLogs.length === 0" class="px-6 py-8 text-center text-gray-500 text-sm">
+            스케줄 또는 즉시 전송한 내역이 없습니다.
+          </div>
+          <div v-else class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+              <thead class="bg-gray-50">
+                <tr>
+                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">전송 시각</th>
+                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">메시지 ID</th>
+                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">상태</th>
+                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">내용 미리보기</th>
+                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">오류</th>
+                </tr>
+              </thead>
+              <tbody class="bg-white divide-y divide-gray-200">
+                <tr v-for="log in messageStore.sendLogs" :key="log.id" class="text-sm">
+                  <td class="px-4 py-2 text-gray-600">{{ new Date(log.sentAt).toLocaleString('ko-KR') }}</td>
+                  <td class="px-4 py-2 font-mono text-gray-700">{{ log.messageId }}</td>
+                  <td class="px-4 py-2">
+                    <span
+                      :class="log.status === 'success'
+                        ? 'inline-flex px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800'
+                        : 'inline-flex px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800'"
+                    >
+                      {{ log.status === 'success' ? '성공' : '실패' }}
+                    </span>
+                  </td>
+                  <td class="px-4 py-2 text-gray-600 max-w-xs truncate">{{ log.contentPreview || '-' }}</td>
+                  <td class="px-4 py-2 text-red-600 max-w-xs truncate" :title="log.error">{{ log.error || '-' }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
     </main>
 
@@ -259,7 +306,8 @@ onMounted(async () => {
   try {
     await Promise.all([
       messageStore.fetchMessages(),
-      webhookStore.fetchWebhooks()
+      webhookStore.fetchWebhooks(),
+      messageStore.fetchSendLogs()
     ])
   } catch (error) {
     console.error('Failed to load data:', error)
