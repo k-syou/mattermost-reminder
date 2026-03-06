@@ -165,11 +165,18 @@ def api(req: https_fn.Request) -> https_fn.Response:
     except Exception:
         request_body = b""
     
+    qs = req.query_string
+    if qs is None:
+        query_string_bytes = b""
+    elif isinstance(qs, bytes):
+        query_string_bytes = qs
+    else:
+        query_string_bytes = qs.encode()
     scope = {
         "type": "http",
         "method": req.method,
         "path": req.path,
-        "query_string": req.query_string.encode() if req.query_string else b"",
+        "query_string": query_string_bytes,
         "headers": headers,
         "server": (req.host.split(":")[0] if ":" in req.host else req.host, 443),
         "client": (req.remote_addr, 0) if req.remote_addr else None,
