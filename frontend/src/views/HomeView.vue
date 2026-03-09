@@ -5,7 +5,8 @@
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="flex justify-between h-16">
           <div class="flex">
-            <div class="flex-shrink-0 flex items-center">
+            <div class="flex-shrink-0 flex items-center gap-2">
+              <img src="/logo.png" alt="Mattermost Reminder" class="h-8 w-8 object-contain" />
               <h1 class="text-xl font-bold text-gray-900">Mattermost Reminder</h1>
             </div>
             <div class="hidden sm:ml-6 sm:flex sm:space-x-8">
