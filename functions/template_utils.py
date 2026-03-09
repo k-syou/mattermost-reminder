@@ -29,6 +29,7 @@ def format_dt_pattern(now: datetime, pattern: str) -> str:
 
     out: list[str] = []
     i = 0
+    used_token = False
     while i < len(p):
         matched = False
         for token, fn in _TOKEN_RENDERERS:
@@ -36,10 +37,13 @@ def format_dt_pattern(now: datetime, pattern: str) -> str:
                 out.append(fn(now))
                 i += len(token)
                 matched = True
+                used_token = True
                 break
         if not matched:
             out.append(p[i])
             i += 1
+    if not used_token:
+        raise ValueError("no supported tokens")
     return "".join(out)
 
 

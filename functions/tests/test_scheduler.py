@@ -15,7 +15,7 @@ async def test_send_scheduled_messages_success(mock_httpx, mock_get_db):
     """Test successful message sending"""
     # Mock current time (Monday 09:00)
     seoul_tz = pytz.timezone("Asia/Seoul")
-    mock_now = datetime(2026, 3, 3, 9, 0, 0)  # Monday
+    mock_now = datetime(2026, 3, 2, 9, 0, 0)  # Monday
     mock_now = seoul_tz.localize(mock_now)
     
     # Mock Firestore documents. API: 0=Sun, 1=Mon, ..., 6=Sat.
@@ -62,7 +62,7 @@ async def test_send_scheduled_messages_success(mock_httpx, mock_get_db):
 
     post_mock = mock_client.__aenter__.return_value.post
     sent_text = post_mock.call_args.kwargs["json"]["text"]
-    assert sent_text == "Monday message at 2026-03-03 09:00"
+    assert sent_text == "Monday message at 2026-03-02 09:00"
     
     # Should send messages that match current day and time
     assert result["processed"] >= 0
