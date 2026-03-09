@@ -230,6 +230,13 @@ Given the user's prompt, output a JSON object with:
 - "content": string, the message body in Markdown. Convert the user's intent into a clear, formatted reminder message.
 - "daysOfWeek": (optional) array of integers 0-6 where 0=Sunday, 1=Monday, ..., 6=Saturday. Include only if the user mentions specific weekdays.
 - "sendTime": (optional) string "HH:MM" in 24h format (e.g. "09:00", "13:30"). Include only if the user mentions a time.
+
+When writing "content", follow these rules:
+1. Always give the message a clear title using Markdown (e.g. "# 제목" or "## 제목") that captures the main point.
+2. Use Mattermost emoji notation actively (e.g. :smile: :calendar: :bell: :clipboard: :rocket:) to make the message friendly and scannable.
+3. Convey key information with lists: use "-" or "*" for bullet lists, or "1. 2. 3." for numbered steps where appropriate.
+4. If the user specifies multiple times or schedules, present them as a list (e.g. "- 09:00 회의\n- 14:00 리뷰") rather than a single block of text.
+
 Return only valid JSON, no other text."""
 
 
