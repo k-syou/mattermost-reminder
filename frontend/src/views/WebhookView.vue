@@ -21,12 +21,21 @@
       <div class="px-4 py-6 sm:px-0">
         <div class="flex justify-between items-center mb-6">
           <h2 class="text-2xl font-bold text-gray-900">웹훅 관리</h2>
-          <button
-            @click="showModal = true"
-            class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700"
-          >
-            웹훅 추가
-          </button>
+          <div class="flex gap-2">
+            <button
+              type="button"
+              @click="showGuideModal = true"
+              class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+            >
+              가이드
+            </button>
+            <button
+              @click="showModal = true"
+              class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700"
+            >
+              웹훅 추가
+            </button>
+          </div>
         </div>
 
         <div v-if="webhookStore.error" class="mb-4 rounded-md bg-red-50 p-4">
@@ -136,17 +145,22 @@
         </div>
       </div>
     </div>
+
+    <!-- 웹훅 등록 가이드 모달 -->
+    <WebhookGuideModal v-model="showGuideModal" />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import { useWebhookStore } from '@/stores/webhook'
+import WebhookGuideModal from '@/components/WebhookGuideModal.vue'
 import type { Webhook } from '@/types/webhook'
 
 const webhookStore = useWebhookStore()
 
 const showModal = ref(false)
+const showGuideModal = ref(false)
 const editingWebhook = ref<Webhook | null>(null)
 
 const form = reactive({
