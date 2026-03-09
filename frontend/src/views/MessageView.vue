@@ -166,7 +166,16 @@
               </h3>
               <div class="space-y-4">
                 <div>
-                  <label for="content" class="block text-sm font-medium text-gray-700">메시지 내용</label>
+                  <div class="flex items-center justify-between">
+                    <label for="content" class="block text-sm font-medium text-gray-700">메시지 내용</label>
+                    <button
+                      type="button"
+                      @click="showAIModal = true"
+                      class="text-sm text-indigo-600 hover:text-indigo-800 font-medium"
+                    >
+                      AI에게 질문하기
+                    </button>
+                  </div>
                   <textarea
                     id="content"
                     v-model="form.content"
@@ -212,6 +221,43 @@
         </div>
       </div>
     </div>
+
+    <!-- AI 질문 모달 -->
+    <div v-if="showAIModal" class="fixed z-20 inset-0 overflow-y-auto" @click.self="showAIModal = false">
+      <div class="flex items-center justify-center min-h-screen p-4">
+        <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" />
+        <div class="relative bg-white rounded-lg shadow-xl max-w-lg w-full p-6">
+          <h4 class="text-lg font-medium text-gray-900 mb-3">AI에게 질문하기</h4>
+          <p class="text-sm text-gray-500 mb-3">
+            원하는 메시지나 요일·시간을 말하면 마크다운 내용과 설정을 추천합니다.
+          </p>
+          <textarea
+            v-model="aiPrompt"
+            rows="4"
+            class="mb-4 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+            placeholder="예: 매주 월수금 오전 9시에 팀 회의 리마인더 알려줘"
+          />
+          <div v-if="aiError" class="mb-3 text-sm text-red-600">{{ aiError }}</div>
+          <div class="flex justify-end gap-2">
+            <button
+              type="button"
+              @click="showAIModal = false; aiPrompt = ''; aiError = ''"
+              class="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+            >
+              취소
+            </button>
+            <button
+              type="button"
+              :disabled="aiLoading || !aiPrompt.trim()"
+              class="px-4 py-2 rounded-md text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              @click="applyAIGenerate"
+            >
+              {{ aiLoading ? '생성 중...' : '생성' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -229,6 +275,10 @@ const messageStore = useMessageStore()
 const webhookStore = useWebhookStore()
 
 const showModal = ref(false)
+const showAIModal = ref(false)
+const aiPrompt = ref('')
+const aiLoading = ref(false)
+const aiError = ref('')
 const editingMessage = ref<Message | null>(null)
 
 const form = reactive({
@@ -299,6 +349,29 @@ const sendNow = async (id: string) => {
   } catch (error) {
     console.error('Send failed:', error)
     alert('메시지 전송에 실패했습니다.')
+  }
+}
+
+const applyAIGenerate = async () => {
+  const prompt = aiPrompt.value.trim()
+  if (!prompt) return
+  aiError.value = ''
+  aiLoading.value = true
+  try {
+    const res = await messageStore.generateFromAI(prompt)
+    form.content = res.content
+    if (res.daysOfWeek && res.daysOfWeek.length > 0) {
+      form.daysOfWeek = res.daysOfWeek
+    }
+    if (res.sendTime) {
+      form.sendTime = res.sendTime
+    }
+    showAIModal.value = false
+    aiPrompt.value = ''
+  } catch (e: any) {
+    aiError.value = e?.message || 'AI 생성에 실패했습니다.'
+  } finally {
+    aiLoading.value = false
   }
 }
 

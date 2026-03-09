@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { useAuthStore } from './auth'
-import type { Message, SendLog } from '@/types/message'
+import type { Message, SendLog, MessageAIGenerateResponse } from '@/types/message'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || ''
 
@@ -176,6 +176,26 @@ export const useMessageStore = defineStore('message', () => {
     }
   }
 
+  const generateFromAI = async (prompt: string): Promise<MessageAIGenerateResponse> => {
+    const token = await authStore.getIdToken()
+    if (!token) throw new Error('인증 토큰이 없습니다.')
+
+    const response = await fetch(`${API_BASE_URL}/api/messages/ai-generate`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ prompt })
+    })
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({ detail: response.statusText }))
+      throw new Error(err.detail || 'AI 생성에 실패했습니다.')
+    }
+    return response.json()
+  }
+
   return {
     messages,
     sendLogs,
@@ -186,6 +206,7 @@ export const useMessageStore = defineStore('message', () => {
     updateMessage,
     deleteMessage,
     sendMessageNow,
-    fetchSendLogs
+    fetchSendLogs,
+    generateFromAI
   }
 })

@@ -60,3 +60,13 @@ class SendLogResponse(BaseModel):
     sentAt: datetime
     error: Optional[str] = None
     contentPreview: Optional[str] = None
+
+
+class MessageAIGenerateRequest(BaseModel):
+    prompt: str = Field(..., min_length=1, max_length=2000)
+
+
+class MessageAIGenerateResponse(BaseModel):
+    content: str
+    daysOfWeek: Optional[List[int]] = None  # 0=Sun .. 6=Sat
+    sendTime: Optional[str] = None  # HH:MM

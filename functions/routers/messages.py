@@ -1,6 +1,8 @@
 """
 Message CRUD API endpoints
 """
+import json
+import os
 from fastapi import APIRouter, HTTPException, Depends
 from firebase_admin import firestore
 from typing import List, Any
@@ -8,7 +10,14 @@ from datetime import datetime, timezone
 import httpx
 
 from dependencies import get_current_user
-from models import MessageCreate, MessageUpdate, MessageResponse, SendLogResponse
+from models import (
+    MessageCreate,
+    MessageUpdate,
+    MessageResponse,
+    SendLogResponse,
+    MessageAIGenerateRequest,
+    MessageAIGenerateResponse,
+)
 
 router = APIRouter()
 
@@ -214,6 +223,63 @@ async def list_send_logs(
     except Exception:
         pass
     return logs[:limit]
+
+
+AI_SYSTEM_PROMPT = """You are a helper for creating Mattermost reminder messages.
+Given the user's prompt, output a JSON object with:
+- "content": string, the message body in Markdown. Convert the user's intent into a clear, formatted reminder message.
+- "daysOfWeek": (optional) array of integers 0-6 where 0=Sunday, 1=Monday, ..., 6=Saturday. Include only if the user mentions specific weekdays.
+- "sendTime": (optional) string "HH:MM" in 24h format (e.g. "09:00", "13:30"). Include only if the user mentions a time.
+Return only valid JSON, no other text."""
+
+
+@router.post("/ai-generate", response_model=MessageAIGenerateResponse)
+async def ai_generate_message(
+    body: MessageAIGenerateRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    """Generate message content (and optional schedule) from a prompt using gpt-4o-mini."""
+    api_key = os.environ.get("OPENAI_API_KEY")
+    if not api_key:
+        raise HTTPException(
+            status_code=503,
+            detail="OPENAI_API_KEY not configured",
+        )
+    try:
+        from openai import OpenAI
+        client = OpenAI(api_key=api_key)
+        resp = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": AI_SYSTEM_PROMPT},
+                {"role": "user", "content": body.prompt},
+            ],
+            response_format={"type": "json_object"},
+        )
+        raw = resp.choices[0].message.content
+        data = json.loads(raw)
+        content = data.get("content") or ""
+        if not content.strip():
+            content = body.prompt
+        days_of_week = data.get("daysOfWeek")
+        if days_of_week is not None and not isinstance(days_of_week, list):
+            days_of_week = None
+        if days_of_week is not None:
+            days_of_week = [int(d) for d in days_of_week if isinstance(d, (int, float)) and 0 <= int(d) <= 6]
+        send_time = data.get("sendTime")
+        if send_time and not isinstance(send_time, str):
+            send_time = None
+        if send_time and len(send_time) != 5:
+            send_time = None
+        return MessageAIGenerateResponse(
+            content=content.strip(),
+            daysOfWeek=days_of_week if days_of_week else None,
+            sendTime=send_time,
+        )
+    except json.JSONDecodeError as e:
+        raise HTTPException(status_code=502, detail=f"Invalid AI response: {e}")
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"AI generate failed: {str(e)}")
 
 
 @router.get("/{message_id}", response_model=MessageResponse)

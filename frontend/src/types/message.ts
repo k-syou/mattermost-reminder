@@ -34,3 +34,9 @@ export interface SendLog {
   error?: string
   contentPreview?: string
 }
+
+export interface MessageAIGenerateResponse {
+  content: string
+  daysOfWeek?: number[]
+  sendTime?: string
+}
