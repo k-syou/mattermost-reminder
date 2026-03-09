@@ -109,6 +109,7 @@ def test_send_message_now(mock_get_db, mock_httpx, client, mock_message_data):
     # Mock Firestore
     mock_doc = Mock()
     mock_doc.id = "message-123"
+    mock_message_data["content"] = "Now {yyyy-MM-dd HH:mm} / {M/d} / {MM/dd}"
     mock_doc.to_dict.return_value = mock_message_data
     mock_doc.get.return_value = mock_doc
     
@@ -136,3 +137,8 @@ def test_send_message_now(mock_get_db, mock_httpx, client, mock_message_data):
     assert response.status_code == 200
     data = response.json()
     assert data["success"] is True
+
+    post_mock = mock_client.__aenter__.return_value.post
+    sent_text = post_mock.call_args.kwargs["json"]["text"]
+    assert "{yyyy" not in sent_text
+    assert "Now " in sent_text

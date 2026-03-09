@@ -171,13 +171,22 @@
                 <div>
                   <div class="flex items-center justify-between">
                     <label for="content" class="block text-sm font-medium text-gray-700">메시지 내용</label>
-                    <button
-                      type="button"
-                      @click="showAIModal = true"
-                      class="text-sm text-indigo-600 hover:text-indigo-800 font-medium"
-                    >
-                      AI에게 질문하기
-                    </button>
+                    <div class="flex items-center gap-3">
+                      <button
+                        type="button"
+                        @click="showTemplateGuideModal = true"
+                        class="text-sm text-gray-600 hover:text-gray-900 font-medium"
+                      >
+                        템플릿 가이드
+                      </button>
+                      <button
+                        type="button"
+                        @click="showAIModal = true"
+                        class="text-sm text-indigo-600 hover:text-indigo-800 font-medium"
+                      >
+                        AI에게 질문하기
+                      </button>
+                    </div>
                   </div>
                   <textarea
                     id="content"
@@ -225,6 +234,8 @@
       </div>
     </div>
 
+    <MessageTemplateGuideModal v-model="showTemplateGuideModal" />
+
     <!-- AI 질문 모달 -->
     <div v-if="showAIModal" class="fixed z-20 inset-0 overflow-y-auto" @click.self="showAIModal = false">
       <div class="flex items-center justify-center min-h-screen p-4">
@@ -271,6 +282,7 @@ import { useWebhookStore } from '@/stores/webhook'
 import DaySelector from '@/components/DaySelector.vue'
 import TimeSelector from '@/components/TimeSelector.vue'
 import WebhookSelector from '@/components/WebhookSelector.vue'
+import MessageTemplateGuideModal from '@/components/MessageTemplateGuideModal.vue'
 import { formatDaysOfWeek } from '@/utils/format'
 import type { Message } from '@/types/message'
 
@@ -279,6 +291,7 @@ const webhookStore = useWebhookStore()
 
 const showModal = ref(false)
 const showAIModal = ref(false)
+const showTemplateGuideModal = ref(false)
 const aiPrompt = ref('')
 const aiLoading = ref(false)
 const aiError = ref('')

@@ -11,6 +11,7 @@ from firebase_admin import firestore, initialize_app
 from fastapi import APIRouter, HTTPException
 import httpx
 import pytz
+from template_utils import render_message_template
 
 logger = logging.getLogger(__name__)
 
@@ -107,13 +108,14 @@ async def _run_send_scheduled_messages():
 
     results = []
     for message in messages_to_send:
-        content_preview = (message["content"] or "")[:200]
         sent_at = datetime.now(seoul_tz)
+        rendered_content = render_message_template(message["content"] or "", sent_at)
+        content_preview = (rendered_content or "")[:200]
         try:
             async with httpx.AsyncClient() as client:
                 response = await client.post(
                     message["webhookUrl"],
-                    json={"text": message["content"]},
+                    json={"text": rendered_content},
                     timeout=10.0
                 )
                 response.raise_for_status()

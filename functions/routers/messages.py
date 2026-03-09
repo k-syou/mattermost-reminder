@@ -8,8 +8,10 @@ from firebase_admin import firestore
 from typing import List, Any
 from datetime import datetime, timezone
 import httpx
+import pytz
 
 from dependencies import get_current_user
+from template_utils import render_message_template
 from models import (
     MessageCreate,
     MessageUpdate,
@@ -438,13 +440,16 @@ async def send_message_now(
         webhook_url = doc_data["webhookUrl"]
         content = doc_data["content"]
         user_id = doc_data["userId"]
-        content_preview = (content or "")[:200]
+        seoul_tz = pytz.timezone("Asia/Seoul")
+        now = datetime.now(seoul_tz)
+        rendered_content = render_message_template(content or "", now)
+        content_preview = (rendered_content or "")[:200]
 
         try:
             async with httpx.AsyncClient() as client:
                 response = await client.post(
                     webhook_url,
-                    json={"text": content},
+                    json={"text": rendered_content},
                     timeout=10.0
                 )
                 response.raise_for_status()

@@ -11,6 +11,7 @@ from firebase_functions import https_fn, scheduler_fn
 from datetime import datetime
 import httpx
 import pytz
+from template_utils import render_message_template
 import asyncio
 
 _scheduler_logger = logging.getLogger("scheduler")
@@ -355,12 +356,13 @@ def send_scheduled_messages(event: scheduler_fn.ScheduledEvent) -> None:
 
     results = []
     for message in messages_to_send:
-        content_preview = (message["content"] or "")[:200]
         sent_at = datetime.now(seoul_tz)
+        rendered_content = render_message_template(message["content"] or "", sent_at)
+        content_preview = (rendered_content or "")[:200]
         try:
             response = httpx.post(
                 message["webhookUrl"],
-                json={"text": message["content"]},
+                json={"text": rendered_content},
                 timeout=10.0
             )
             response.raise_for_status()
