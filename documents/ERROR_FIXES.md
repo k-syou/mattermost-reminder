@@ -388,3 +388,38 @@ def client(mock_user_dict):
 2026-03-06
 
 ---
+
+## 에러 7: 특정 시간 반복 저장/수정 시 설정이 풀림, DB에 한 개 시간만 저장됨
+
+### 발생 위치
+- **파일**: `functions/routers/messages.py` (create_message, update_message)
+- **증상**: 특정 시간 반복 사용 후 설정해도 수정 모달에 들어가면 설정이 풀려 있음. Firestore에는 여러 전송시간이 아닌 한 개 시간만 저장됨.
+
+### 원인 분석
+1. **time range 저장 조건**  
+   - timeRangeStart/timeRangeEnd/intervalSeconds를 `is not None`만으로 저장해, 빈 문자열(`""`)이나 `intervalSeconds: 0`도 저장됨.  
+   - 조회 시 빈 문자열/0이 오면 프론트에서 `useTimeRangeMode`가 false로 계산되어 수정 시 폼이 풀려 보임.
+2. **sendTimes와 time range 동시 저장**  
+   - time range가 유효할 때도 `sendTimes`를 요청값 그대로 넣어, 특정 시간 반복 모드에서 `sendTimes: []`가 아닌 한 개 시간이 들어갈 여지가 있음.
+
+### 해결 방법
+1. **create_message**  
+   - `has_valid_range`: timeRangeStart/End가 비어 있지 않은 문자열이고, intervalSeconds가 존재하며 >= 1일 때만 True.  
+   - `has_valid_range`일 때만 message_data에 timeRangeStart, timeRangeEnd, intervalSeconds를 넣고, **sendTimes는 반드시 []**로 저장.  
+   - 그 외에는 sendTimes만 요청대로 저장.
+2. **update_message**  
+   - 특정 시간 반복 적용 시 `message.timeRangeStart`/End가 strip 후 비어 있지 않고, `message.intervalSeconds >= 1`일 때만 range 필드와 `sendTimes = []` 반영.  
+   - 고정 전송시간만 보낼 때는 기존처럼 timeRange* 필드를 None으로 정리.
+
+### 수정 내용
+- **create_message**: `has_valid_range` 도입 후, 유효할 때만 timeRangeStart/End/intervalSeconds 저장 및 sendTimes=[] 강제.  
+- **update_message**: `use_time_range` 조건에 start/end non-empty, intervalSeconds >= 1 추가 후, range 저장 시 strip 적용 및 sendTimes=[] 설정.
+
+### 검증 결과
+- 특정 시간 반복으로 생성/수정 후 수정 모달 재진입 시 설정 유지.
+- Firestore에 time range 사용 시 sendTimes는 [], timeRangeStart/End/intervalSeconds만 저장.
+
+### 적용 날짜
+2026-03-06
+
+---

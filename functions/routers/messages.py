@@ -139,13 +139,18 @@ async def create_message(
                     status_code=400,
                     detail="timeRangeStart must be before timeRangeEnd (same day); intervalSeconds 1–86400"
                 )
+        has_valid_range = (
+            time_range_start and str(time_range_start).strip()
+            and time_range_end and str(time_range_end).strip()
+            and interval_seconds is not None and interval_seconds >= 1
+        )
 
         message_data = {
             "userId": current_user["uid"],
             "content": message.content,
             "daysOfWeek": message.daysOfWeek,
             "sendTime": message.sendTime,
-            "sendTimes": send_times,
+            "sendTimes": send_times if not has_valid_range else [],
             "repeatCycle": repeat_cycle,
             "sendOnce": getattr(message, "sendOnce", False),
             "webhookUrl": str(message.webhookUrl),
@@ -153,14 +158,10 @@ async def create_message(
             "createdAt": firestore.SERVER_TIMESTAMP,
             "updatedAt": firestore.SERVER_TIMESTAMP
         }
-        if time_range_start is not None:
-            message_data["timeRangeStart"] = time_range_start
-        if time_range_end is not None:
-            message_data["timeRangeEnd"] = time_range_end
-        if interval_seconds is not None:
-            message_data["intervalSeconds"] = interval_seconds
-        if time_range_start and time_range_end and interval_seconds is not None:
-            message_data["sendTimes"] = []
+        if has_valid_range:
+            message_data["timeRangeStart"] = (time_range_start or "").strip()
+            message_data["timeRangeEnd"] = (time_range_end or "").strip()
+            message_data["intervalSeconds"] = int(interval_seconds)
 
         doc_ref = db.collection("messages").add(message_data)
         message_id = doc_ref[1].id
@@ -470,19 +471,22 @@ async def update_message(
         if message.sendOnce is not None:
             update_data["sendOnce"] = message.sendOnce
         use_time_range = (
-            message.timeRangeStart and message.timeRangeEnd and message.intervalSeconds is not None
+            message.timeRangeStart and str(message.timeRangeStart).strip()
+            and message.timeRangeEnd and str(message.timeRangeEnd).strip()
+            and message.intervalSeconds is not None
+            and message.intervalSeconds >= 1
         )
         if use_time_range:
             if not get_send_times_from_range(
-                message.timeRangeStart, message.timeRangeEnd, message.intervalSeconds
+                message.timeRangeStart.strip(), message.timeRangeEnd.strip(), message.intervalSeconds
             ):
                 raise HTTPException(
                     status_code=400,
                     detail="timeRangeStart must be before timeRangeEnd; intervalSeconds 1–86400"
                 )
-            update_data["timeRangeStart"] = message.timeRangeStart
-            update_data["timeRangeEnd"] = message.timeRangeEnd
-            update_data["intervalSeconds"] = message.intervalSeconds
+            update_data["timeRangeStart"] = message.timeRangeStart.strip()
+            update_data["timeRangeEnd"] = message.timeRangeEnd.strip()
+            update_data["intervalSeconds"] = int(message.intervalSeconds)
             update_data["sendTimes"] = []
         elif message.sendTimes is not None and len(message.sendTimes) > 0:
             update_data["timeRangeStart"] = None
