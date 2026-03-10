@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div :class="{ 'opacity-60 pointer-events-none': disabled }">
     <label class="block text-sm font-medium text-gray-700 mb-2">요일 선택</label>
     <div class="flex flex-wrap gap-2">
       <label
@@ -14,13 +14,14 @@
           type="checkbox"
           :value="day.value"
           :checked="selectedDays.includes(day.value)"
+          :disabled="disabled"
           @change="toggleDay(day.value)"
           class="sr-only"
         />
         <span>{{ day.label }}</span>
       </label>
     </div>
-    <p v-if="selectedDays.length === 0" class="mt-1 text-sm text-red-600">
+    <p v-if="!disabled && selectedDays.length === 0" class="mt-1 text-sm text-red-600">
       최소 하나의 요일을 선택해야 합니다.
     </p>
   </div>
@@ -29,9 +30,13 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 
-const props = defineProps<{
-  modelValue: number[]
-}>()
+const props = withDefaults(
+  defineProps<{
+    modelValue: number[]
+    disabled?: boolean
+  }>(),
+  { disabled: false }
+)
 
 const emit = defineEmits<{
   'update:modelValue': [value: number[]]

@@ -9,7 +9,7 @@ export interface Message {
   sendOnce?: boolean
   timeRangeStart?: string
   timeRangeEnd?: string
-  intervalMinutes?: number
+  intervalSeconds?: number
   webhookUrl: string
   isActive: boolean
   createdAt: string
@@ -25,7 +25,7 @@ export interface MessageCreate {
   sendOnce?: boolean
   timeRangeStart?: string
   timeRangeEnd?: string
-  intervalMinutes?: number
+  intervalSeconds?: number
   webhookUrl: string
   isActive?: boolean
 }
@@ -39,7 +39,7 @@ export interface MessageUpdate {
   sendOnce?: boolean
   timeRangeStart?: string
   timeRangeEnd?: string
-  intervalMinutes?: number
+  intervalSeconds?: number
   webhookUrl?: string
   isActive?: boolean
 }

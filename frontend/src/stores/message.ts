@@ -46,7 +46,7 @@ export const useMessageStore = defineStore('message', () => {
     sendOnce?: boolean
     timeRangeStart?: string
     timeRangeEnd?: string
-    intervalMinutes?: number
+    intervalSeconds?: number
     webhookUrl: string
     isActive?: boolean
   }) => {
@@ -86,7 +86,7 @@ export const useMessageStore = defineStore('message', () => {
     sendOnce: boolean
     timeRangeStart: string
     timeRangeEnd: string
-    intervalMinutes: number
+    intervalSeconds: number
     webhookUrl: string
     isActive: boolean
   }>) => {

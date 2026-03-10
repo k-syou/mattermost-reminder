@@ -83,8 +83,9 @@
                   </div>
                   <div class="mt-2 text-sm text-gray-500">
                     <p>반복: {{ message.repeatCycle === 'daily' ? '매일' : '매주 ' + formatDaysOfWeek(message.daysOfWeek) }}</p>
-                    <p v-if="message.timeRangeStart && message.timeRangeEnd && message.intervalMinutes != null">
-                      시간: {{ message.timeRangeStart }}~{{ message.timeRangeEnd }} {{ message.intervalMinutes }}분 간격
+                    <p v-if="message.timeRangeStart && message.timeRangeEnd && (message.intervalSeconds ?? 0) > 0">
+                      시간: {{ message.timeRangeStart }}~{{ message.timeRangeEnd }}
+                      {{ formatInterval(message.intervalSeconds!) }} 간격
                     </p>
                     <p v-else>시간: {{ (message.sendTimes && message.sendTimes.length) ? message.sendTimes.join(', ') : message.sendTime }}</p>
                     <p class="break-all">웹훅: {{ message.webhookUrl }}</p>
@@ -216,25 +217,32 @@
                     placeholder="Markdown 형식 지원"
                   />
                 </div>
-                <DaySelector v-model="form.daysOfWeek" />
+                <DaySelector v-model="form.daysOfWeek" :disabled="form.repeatCycle === 'daily'" />
                 <div>
                   <label class="block text-sm font-medium text-gray-700 mb-1">반복 주기</label>
                   <select
                     v-model="form.repeatCycle"
                     class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                    @change="onRepeatCycleChange"
                   >
                     <option value="weekly">매주 (요일 선택 기준)</option>
                     <option value="daily">매일</option>
                   </select>
+                  <p v-if="form.repeatCycle === 'daily'" class="mt-1 text-sm text-gray-500">매일 선택 시 모든 요일이 자동 적용됩니다.</p>
                 </div>
-                <div>
+                <div
+                  class="transition-opacity"
+                  :class="{ 'opacity-50 pointer-events-none': form.useTimeRangeMode }"
+                >
                   <label class="block text-sm font-medium text-gray-700 mb-1">전송 시간</label>
+                  <p v-if="form.useTimeRangeMode" class="text-xs text-amber-600 mb-1">특정 시간 반복을 사용 중이라 편집할 수 없습니다.</p>
                   <div class="flex gap-2 items-end">
-                    <TimeSelector v-model="form.sendTime" class="flex-1" />
+                    <TimeSelector v-model="form.sendTime" :show-label="false" class="flex-1" />
                     <button
                       type="button"
+                      :disabled="form.useTimeRangeMode"
                       @click="addSendTime"
-                      class="px-3 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                      class="px-3 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       시간 추가
                     </button>
@@ -246,15 +254,29 @@
                       class="inline-flex items-center gap-1 px-2 py-1 rounded bg-gray-100 text-sm"
                     >
                       {{ t }}
-                      <button type="button" @click="removeSendTime(i)" class="text-gray-500 hover:text-red-600">&times;</button>
+                      <button type="button" :disabled="form.useTimeRangeMode" @click="removeSendTime(i)" class="text-gray-500 hover:text-red-600 disabled:opacity-50 disabled:cursor-not-allowed">&times;</button>
                     </span>
                   </div>
-                  <p class="mt-1 text-sm text-gray-500">여러 시간을 추가하면 해당 시간마다 전송됩니다. Asia/Seoul 기준.</p>
+                  <p class="mt-1 text-sm text-gray-500">여러 시간을 추가하면 해당 시간마다 전송됩니다.</p>
                 </div>
-                <div class="rounded-lg border border-gray-200 bg-gray-50 p-3">
-                  <p class="text-sm font-medium text-gray-700 mb-2">특정 시간대 N분 간격 반복</p>
-                  <p class="text-xs text-gray-500 mb-2">시작~종료 시간 사이를 지정한 간격(분)마다 전송합니다. 설정 시 위 전송 시간 목록보다 우선합니다.</p>
-                  <div class="grid grid-cols-3 gap-2 items-end">
+                <div
+                  class="transition-opacity"
+                  :class="{ 'opacity-50 pointer-events-none': !form.useTimeRangeMode && form.sendTimes.length > 0 }"
+                >
+                  <div class="flex items-center gap-2 mb-1">
+                    <input
+                      id="useTimeRangeMode"
+                      v-model="form.useTimeRangeMode"
+                      type="checkbox"
+                      class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                    />
+                    <label for="useTimeRangeMode" class="block text-sm font-medium text-gray-700">특정 시간 반복 사용</label>
+                  </div>
+                  <p v-if="form.useTimeRangeMode && !timeRangeValid" class="text-xs text-red-600 mb-1">
+                    시작·종료 시간과 간격(시/분/초 중 최소 1초 이상)을 모두 입력해 주세요.
+                  </p>
+                  <p v-else-if="form.useTimeRangeMode" class="text-xs text-gray-500 mb-1">시작~종료 시간 사이를 지정한 간격마다 전송합니다. 둘 중 하나만 선택 가능합니다.</p>
+                  <div v-if="form.useTimeRangeMode" class="grid grid-cols-2 sm:grid-cols-5 gap-2 items-end mt-1">
                     <div>
                       <label for="timeRangeStart" class="block text-xs text-gray-600">시작</label>
                       <input
@@ -274,21 +296,43 @@
                       />
                     </div>
                     <div>
-                      <label for="intervalMinutes" class="block text-xs text-gray-600">간격(분)</label>
-                      <select
-                        id="intervalMinutes"
-                        v-model.number="form.intervalMinutes"
+                      <label for="intervalHours" class="block text-xs text-gray-600">간격 시</label>
+                      <input
+                        id="intervalHours"
+                        v-model.number="form.intervalHours"
+                        type="number"
+                        min="0"
+                        max="24"
                         class="mt-0.5 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                      >
-                        <option :value="undefined">미사용</option>
-                        <option :value="5">5분</option>
-                        <option :value="10">10분</option>
-                        <option :value="15">15분</option>
-                        <option :value="30">30분</option>
-                        <option :value="60">60분</option>
-                      </select>
+                        placeholder="0"
+                      />
+                    </div>
+                    <div>
+                      <label for="intervalMins" class="block text-xs text-gray-600">간격 분</label>
+                      <input
+                        id="intervalMins"
+                        v-model.number="form.intervalMins"
+                        type="number"
+                        min="0"
+                        max="59"
+                        class="mt-0.5 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                        placeholder="0"
+                      />
+                    </div>
+                    <div>
+                      <label for="intervalSecs" class="block text-xs text-gray-600">간격 초</label>
+                      <input
+                        id="intervalSecs"
+                        v-model.number="form.intervalSecs"
+                        type="number"
+                        min="0"
+                        max="59"
+                        class="mt-0.5 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                        placeholder="0"
+                      />
                     </div>
                   </div>
+                  <p v-if="form.useTimeRangeMode" class="mt-1 text-sm text-gray-500">Asia/Seoul 시간대 기준</p>
                 </div>
                 <WebhookSelector v-model="form.webhookUrl" />
                 <div class="flex flex-col gap-2">
@@ -320,7 +364,7 @@
             <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
               <button
                 type="submit"
-                :disabled="messageStore.loading || (form.repeatCycle === 'weekly' && form.daysOfWeek.length === 0)"
+                :disabled="messageStore.loading || (form.repeatCycle === 'weekly' && form.daysOfWeek.length === 0) || (form.useTimeRangeMode && !timeRangeValid)"
                 class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-indigo-600 text-base font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:ml-3 sm:w-auto sm:text-sm disabled:opacity-50"
               >
                 {{ messageStore.loading ? '처리 중...' : (editingMessage ? '수정' : '추가') }}
@@ -380,7 +424,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useMessageStore } from '@/stores/message'
 import { useWebhookStore } from '@/stores/webhook'
@@ -391,6 +435,17 @@ import WebhookSelector from '@/components/WebhookSelector.vue'
 import MessageTemplateGuideModal from '@/components/MessageTemplateGuideModal.vue'
 import { formatDaysOfWeek } from '@/utils/format'
 import type { Message } from '@/types/message'
+
+function formatInterval(seconds: number): string {
+  const h = Math.floor(seconds / 3600)
+  const m = Math.floor((seconds % 3600) / 60)
+  const s = seconds % 60
+  const parts = []
+  if (h > 0) parts.push(`${h}시간`)
+  if (m > 0) parts.push(`${m}분`)
+  if (s > 0) parts.push(`${s}초`)
+  return parts.length ? parts.join(' ') : '0초'
+}
 
 const router = useRouter()
 const messageStore = useMessageStore()
@@ -421,12 +476,26 @@ const form = reactive({
   sendTimes: [] as string[],
   repeatCycle: 'weekly' as 'daily' | 'weekly',
   sendOnce: false,
+  useTimeRangeMode: false,
   timeRangeStart: '' as string,
   timeRangeEnd: '' as string,
-  intervalMinutes: undefined as number | undefined,
+  intervalHours: 0 as number,
+  intervalMins: 0 as number,
+  intervalSecs: 0 as number,
   webhookUrl: '',
   isActive: true
 })
+
+const timeRangeValid = computed(() => {
+  const sec = (form.intervalHours || 0) * 3600 + (form.intervalMins || 0) * 60 + (form.intervalSecs || 0)
+  return !!(form.timeRangeStart && form.timeRangeEnd && sec >= 1)
+})
+
+function onRepeatCycleChange() {
+  if (form.repeatCycle === 'daily') {
+    form.daysOfWeek = [0, 1, 2, 3, 4, 5, 6]
+  }
+}
 
 const addSendTime = () => {
   if (form.sendTime && !form.sendTimes.includes(form.sendTime)) {
@@ -447,9 +516,12 @@ const closeModal = () => {
   form.sendTimes = []
   form.repeatCycle = 'weekly'
   form.sendOnce = false
+  form.useTimeRangeMode = false
   form.timeRangeStart = ''
   form.timeRangeEnd = ''
-  form.intervalMinutes = undefined
+  form.intervalHours = 0
+  form.intervalMins = 0
+  form.intervalSecs = 0
   form.webhookUrl = ''
   form.isActive = true
 }
@@ -461,10 +533,15 @@ const editMessage = (message: Message) => {
   form.sendTime = message.sendTime
   form.sendTimes = message.sendTimes?.length ? [...message.sendTimes] : []
   form.repeatCycle = message.repeatCycle || 'weekly'
+  if (form.repeatCycle === 'daily') form.daysOfWeek = [0, 1, 2, 3, 4, 5, 6]
   form.sendOnce = message.sendOnce ?? false
   form.timeRangeStart = message.timeRangeStart ?? ''
   form.timeRangeEnd = message.timeRangeEnd ?? ''
-  form.intervalMinutes = message.intervalMinutes
+  const total = message.intervalSeconds ?? 0
+  form.intervalHours = Math.floor(total / 3600)
+  form.intervalMins = Math.floor((total % 3600) / 60)
+  form.intervalSecs = total % 60
+  form.useTimeRangeMode = !!(message.timeRangeStart && message.timeRangeEnd && total >= 1)
   form.webhookUrl = message.webhookUrl
   form.isActive = message.isActive
   showModal.value = true
@@ -472,7 +549,11 @@ const editMessage = (message: Message) => {
 
 const handleSubmit = async () => {
   try {
-    const useRange = form.timeRangeStart && form.timeRangeEnd && form.intervalMinutes != null
+    if (form.useTimeRangeMode && !timeRangeValid.value) {
+      return
+    }
+    const intervalSeconds = (form.intervalHours || 0) * 3600 + (form.intervalMins || 0) * 60 + (form.intervalSecs || 0)
+    const useRange = form.useTimeRangeMode && timeRangeValid.value
     const allTimes = useRange ? [] : (form.sendTimes.length ? form.sendTimes : [form.sendTime])
     const payload = {
       content: form.content,
@@ -484,7 +565,7 @@ const handleSubmit = async () => {
       ...(useRange && {
         timeRangeStart: form.timeRangeStart,
         timeRangeEnd: form.timeRangeEnd,
-        intervalMinutes: form.intervalMinutes
+        intervalSeconds
       }),
       webhookUrl: form.webhookUrl,
       isActive: form.isActive

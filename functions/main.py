@@ -337,14 +337,16 @@ def send_scheduled_messages(event: scheduler_fn.ScheduledEvent) -> None:
         days_of_week = data.get("daysOfWeek", [])
         tr_start = data.get("timeRangeStart")
         tr_end = data.get("timeRangeEnd")
-        interval_min = data.get("intervalMinutes")
-        if tr_start and tr_end and interval_min is not None:
-            send_times = get_send_times_from_range(tr_start, tr_end, int(interval_min))
+        interval_sec = data.get("intervalSeconds") or (data.get("intervalMinutes") or 0) * 60
+        if tr_start and tr_end and interval_sec:
+            send_times = get_send_times_from_range(tr_start, tr_end, int(interval_sec))
         else:
             send_times = data.get("sendTimes")
             if not send_times or not isinstance(send_times, list):
                 send_times = [data.get("sendTime", "")]
-            send_times = [t for t in send_times if isinstance(t, str) and len(t) == 5]
+            send_times = [t for t in send_times if isinstance(t, str) and (len(t) == 5 or len(t) == 8)]
+        use_seconds = any(len(t) == 8 for t in send_times) if send_times else False
+        current_time = (now.strftime("%H:%M:%S") if use_seconds else now.strftime("%H:%M"))
         repeat_cycle = data.get("repeatCycle", "weekly")
         day_ok = (repeat_cycle == "daily") or (current_day in days_of_week)
         time_ok = current_time in send_times

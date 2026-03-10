@@ -1,6 +1,6 @@
 <template>
   <div>
-    <label for="time" class="block text-sm font-medium text-gray-700">전송 시간</label>
+    <label v-if="showLabel" for="time" class="block text-sm font-medium text-gray-700">전송 시간</label>
     <input
       id="time"
       v-model="timeValue"
@@ -16,9 +16,13 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 
-const props = defineProps<{
-  modelValue: string
-}>()
+const props = withDefaults(
+  defineProps<{
+    modelValue: string
+    showLabel?: boolean
+  }>(),
+  { showLabel: true }
+)
 
 const emit = defineEmits<{
   'update:modelValue': [value: string]
