@@ -349,3 +349,42 @@ def client(mock_user_dict):
 2026-03-05
 
 ---
+
+## 에러 6: 메시지 전송시간 여러 개 / 특정시간 반복 저장 안 됨
+
+### 발생 위치
+- **파일**: `functions/routers/messages.py`
+- **영향**: 메시지 생성(create_message), 메시지 수정(update_message)
+- **증상**: 전송시간을 여러 개 추가해도 저장되지 않음. 특정시간 반복 사용 설정해도 적용되지 않음.
+
+### 원인 분석
+1. **전송시간 여러 개**  
+   - `create_message`에서 `send_times = message.sendTimes if message.sendTimes else [message.sendTime]` 사용.  
+   - Python에서 빈 리스트 `[]`는 falsy이므로, 클라이언트가 특정시간 반복 모드로 `sendTimes: []`를 보내면 `[message.sendTime]`으로 덮어써서 한 개 시간만 저장됨.  
+   - 여러 개 보낼 때는 동작하지만, 빈 배열/특정시간 반복 전환 시 sendTimes가 의도와 다르게 저장될 수 있음.
+2. **특정시간 반복**  
+   - 특정시간 반복 사용 시 클라이언트는 `timeRangeStart`, `timeRangeEnd`, `intervalSeconds`와 함께 `sendTimes: []` 전송.  
+   - 위 로직으로 `sendTimes`가 한 개 시간으로 덮어써지고, 스케줄러가 시간대+간격이 아닌 단일 시간으로 동작할 수 있음.  
+   - `update_message`에서는 시간대 모드와 고정 시간 모드가 서로 배타적으로 정리되지 않아, 이전 모드 필드가 문서에 남을 수 있음.
+
+### 해결 방법
+1. **create_message**  
+   - `send_times` 결정 시 `message.sendTimes is not None`으로만 판단하여, 클라이언트가 보낸 빈 배열 `[]`를 그대로 저장.  
+   - 특정시간 반복일 때(timeRangeStart/End/intervalSeconds 모두 있음) `message_data["sendTimes"] = []`로 명시.
+2. **update_message**  
+   - 특정시간 반복으로 업데이트할 때: range 세 필드 설정 후 `sendTimes = []` 설정.  
+   - 고정 전송시간으로 업데이트할 때: `sendTimes` 설정 후 `timeRangeStart`, `timeRangeEnd`, `intervalSeconds`를 `None`으로 초기화.
+
+### 수정 내용
+- **create_message**: `send_times = message.sendTimes if message.sendTimes is not None else [message.sendTime]` 로 변경. time range 세 필드가 모두 있을 때 `message_data["sendTimes"] = []` 추가.
+- **update_message**: `use_time_range`일 때 range 세 필드 + `sendTimes = []`. `message.sendTimes`가 있고 길이 > 0일 때 range 세 필드를 `None`으로 설정. 그 외는 기존처럼 각 필드만 반영.
+
+### 검증 결과
+- create 시 `sendTimes: ["09:00", "10:00"]` 전송 시 문서에 여러 전송시간 저장.
+- create 시 특정시간 반복 전송 시 시간대·간격 저장, sendTimes는 [].
+- update 시 모드 전환 시 반대 모드 필드 제거.
+
+### 적용 날짜
+2026-03-06
+
+---

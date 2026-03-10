@@ -125,7 +125,7 @@ async def create_message(
                 status_code=400,
                 detail="daysOfWeek must contain values between 0 (Sunday) and 6 (Saturday)"
             )
-        send_times = message.sendTimes if message.sendTimes else [message.sendTime]
+        send_times = message.sendTimes if message.sendTimes is not None else [message.sendTime]
         for t in send_times:
             if not (isinstance(t, str) and TIME_RE.match(t)):
                 raise HTTPException(status_code=400, detail="sendTimes must be HH:MM strings")
@@ -159,6 +159,8 @@ async def create_message(
             message_data["timeRangeEnd"] = time_range_end
         if interval_seconds is not None:
             message_data["intervalSeconds"] = interval_seconds
+        if time_range_start and time_range_end and interval_seconds is not None:
+            message_data["sendTimes"] = []
 
         doc_ref = db.collection("messages").add(message_data)
         message_id = doc_ref[1].id
@@ -467,13 +469,10 @@ async def update_message(
             update_data["repeatCycle"] = message.repeatCycle
         if message.sendOnce is not None:
             update_data["sendOnce"] = message.sendOnce
-        if message.timeRangeStart is not None:
-            update_data["timeRangeStart"] = message.timeRangeStart
-        if message.timeRangeEnd is not None:
-            update_data["timeRangeEnd"] = message.timeRangeEnd
-        if message.intervalSeconds is not None:
-            update_data["intervalSeconds"] = message.intervalSeconds
-        if message.timeRangeStart and message.timeRangeEnd and message.intervalSeconds is not None:
+        use_time_range = (
+            message.timeRangeStart and message.timeRangeEnd and message.intervalSeconds is not None
+        )
+        if use_time_range:
             if not get_send_times_from_range(
                 message.timeRangeStart, message.timeRangeEnd, message.intervalSeconds
             ):
@@ -481,6 +480,21 @@ async def update_message(
                     status_code=400,
                     detail="timeRangeStart must be before timeRangeEnd; intervalSeconds 1–86400"
                 )
+            update_data["timeRangeStart"] = message.timeRangeStart
+            update_data["timeRangeEnd"] = message.timeRangeEnd
+            update_data["intervalSeconds"] = message.intervalSeconds
+            update_data["sendTimes"] = []
+        elif message.sendTimes is not None and len(message.sendTimes) > 0:
+            update_data["timeRangeStart"] = None
+            update_data["timeRangeEnd"] = None
+            update_data["intervalSeconds"] = None
+        else:
+            if message.timeRangeStart is not None:
+                update_data["timeRangeStart"] = message.timeRangeStart
+            if message.timeRangeEnd is not None:
+                update_data["timeRangeEnd"] = message.timeRangeEnd
+            if message.intervalSeconds is not None:
+                update_data["intervalSeconds"] = message.intervalSeconds
         if message.webhookUrl is not None:
             update_data["webhookUrl"] = str(message.webhookUrl)
         if message.isActive is not None:
