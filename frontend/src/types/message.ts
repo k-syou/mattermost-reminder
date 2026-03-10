@@ -57,4 +57,7 @@ export interface MessageAIGenerateResponse {
   content: string
   daysOfWeek?: number[]
   sendTime?: string
+  timeRangeStart?: string
+  timeRangeEnd?: string
+  intervalSeconds?: number
 }

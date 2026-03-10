@@ -67,13 +67,23 @@
                 <div class="flex-1">
                   <div class="flex items-center flex-wrap gap-2">
                     <p class="text-sm font-medium text-gray-900">{{ message.content }}</p>
-                    <span
-                      :class="message.isActive
-                        ? 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800'
-                        : 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800'"
+                    <button
+                      type="button"
+                      role="switch"
+                      :aria-checked="message.isActive"
+                      :class="[
+                        'relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2',
+                        message.isActive ? 'bg-indigo-600' : 'bg-gray-200'
+                      ]"
+                      @click="toggleActive(message)"
                     >
-                      {{ message.isActive ? '활성' : '비활성' }}
-                    </span>
+                      <span
+                        :class="[
+                          'pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition',
+                          message.isActive ? 'translate-x-5' : 'translate-x-1'
+                        ]"
+                      />
+                    </button>
                     <span
                       v-if="message.sendOnce"
                       class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800"
@@ -94,33 +104,30 @@
                     생성일: {{ new Date(message.createdAt).toLocaleString('ko-KR') }}
                   </p>
                 </div>
-                <div class="ml-4 flex flex-col space-y-2">
+                <div class="ml-4 flex items-center gap-2">
                   <button
-                    @click="toggleActive(message)"
-                    :class="message.isActive
-                      ? 'text-yellow-600 hover:text-yellow-900'
-                      : 'text-green-600 hover:text-green-900'"
-                    class="text-sm font-medium"
-                  >
-                    {{ message.isActive ? '비활성화' : '활성화' }}
-                  </button>
-                  <button
+                    type="button"
+                    class="p-1.5 text-indigo-600 hover:text-indigo-800 rounded"
+                    title="즉시 전송"
                     @click="sendNow(message.id)"
-                    class="text-indigo-600 hover:text-indigo-900 text-sm font-medium"
                   >
-                    즉시 전송
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>
                   </button>
                   <button
+                    type="button"
+                    class="p-1.5 text-gray-600 hover:text-gray-800 rounded"
+                    title="수정"
                     @click="editMessage(message)"
-                    class="text-indigo-600 hover:text-indigo-900 text-sm font-medium"
                   >
-                    수정
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                   </button>
                   <button
+                    type="button"
+                    class="p-1.5 text-red-600 hover:text-red-800 rounded"
+                    title="삭제"
                     @click="deleteMessage(message.id)"
-                    class="text-red-600 hover:text-red-900 text-sm font-medium"
                   >
-                    삭제
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                   </button>
                 </div>
               </div>
@@ -653,6 +660,14 @@ const applyAIGenerate = async () => {
     }
     if (res.sendTime) {
       form.sendTime = res.sendTime
+    }
+    if (res.timeRangeStart && res.timeRangeEnd && (res.intervalSeconds ?? 0) >= 1) {
+      form.useTimeRangeMode = true
+      form.timeRangeStart = res.timeRangeStart
+      form.timeRangeEnd = res.timeRangeEnd
+      form.intervalHours = Math.floor((res.intervalSeconds ?? 0) / 3600)
+      form.intervalMins = Math.floor(((res.intervalSeconds ?? 0) % 3600) / 60)
+      form.intervalSecs = (res.intervalSeconds ?? 0) % 60
     }
     showAIModal.value = false
     aiPrompt.value = ''

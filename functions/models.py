@@ -91,3 +91,6 @@ class MessageAIGenerateResponse(BaseModel):
     content: str
     daysOfWeek: Optional[List[int]] = None  # 0=Sun .. 6=Sat
     sendTime: Optional[str] = None  # HH:MM
+    timeRangeStart: Optional[str] = None  # HH:MM
+    timeRangeEnd: Optional[str] = None  # HH:MM
+    intervalSeconds: Optional[int] = None  # 1..86400

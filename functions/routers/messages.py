@@ -282,7 +282,10 @@ AI_SYSTEM_PROMPT = """You are a helper for creating Mattermost reminder messages
 Given the user's prompt, output a JSON object with:
 - "content": string, the message body in Markdown. Convert the user's intent into a clear, formatted reminder message. The entire "content" must be written in Korean only.
 - "daysOfWeek": (optional) array of integers 0-6 where 0=Sunday, 1=Monday, ..., 6=Saturday. Include only if the user mentions specific weekdays.
-- "sendTime": (optional) string "HH:MM" in 24h format (e.g. "09:00", "13:30"). Include only if the user mentions a time.
+- "sendTime": (optional) string "HH:MM" in 24h format (e.g. "09:00", "13:30"). Include only if the user mentions a single fixed time (not a range).
+- "timeRangeStart": (optional) string "HH:MM" 24h. Include only when the user asks for repeated sends within a time range (e.g. "09:00부터 18:00까지 N분마다").
+- "timeRangeEnd": (optional) string "HH:MM" 24h, must be after timeRangeStart on the same day.
+- "intervalSeconds": (optional) integer 1-86400. Use when the user specifies an interval (e.g. "10분마다" -> 600, "1시간마다" -> 3600). Omit if only fixed sendTime is used.
 
 Language and unclear input:
 - Always write "content" in Korean. Never respond in English or other languages.
@@ -335,10 +338,38 @@ async def ai_generate_message(
             send_time = None
         if send_time and len(send_time) != 5:
             send_time = None
+        tr_start = data.get("timeRangeStart")
+        tr_end = data.get("timeRangeEnd")
+        interval_sec = data.get("intervalSeconds")
+        if tr_start and isinstance(tr_start, str) and TIME_RE.match(tr_start):
+            pass
+        else:
+            tr_start = None
+        if tr_end and isinstance(tr_end, str) and TIME_RE.match(tr_end):
+            pass
+        else:
+            tr_end = None
+        if interval_sec is not None and isinstance(interval_sec, (int, float)):
+            interval_sec = int(interval_sec)
+            if interval_sec < 1 or interval_sec > 86400:
+                interval_sec = None
+        else:
+            interval_sec = None
+        if tr_start and tr_end and interval_sec:
+            start_hm = tuple(map(int, tr_start.split(":")))
+            end_hm = tuple(map(int, tr_end.split(":")))
+            if start_hm >= end_hm:
+                tr_start = tr_end = None
+        else:
+            if not (tr_start and tr_end and interval_sec):
+                tr_start = tr_end = interval_sec = None
         return MessageAIGenerateResponse(
             content=content.strip(),
             daysOfWeek=days_of_week if days_of_week else None,
             sendTime=send_time,
+            timeRangeStart=tr_start,
+            timeRangeEnd=tr_end,
+            intervalSeconds=interval_sec,
         )
     except json.JSONDecodeError as e:
         raise HTTPException(status_code=502, detail=f"Invalid AI response: {e}")
