@@ -32,8 +32,9 @@ class MessageCreate(BaseModel):
     content: str = Field(..., min_length=1)
     daysOfWeek: List[int] = Field(..., min_length=1, max_length=7)
     sendTime: str = Field(..., pattern=_TIME_PATTERN)
-    sendTimes: Optional[List[str]] = None  # multiple times per day; if None/empty, use [sendTime]
+    sendTimes: Optional[List[str]] = None
     repeatCycle: Optional[str] = Field(default="weekly", pattern=r'^(daily|weekly)$')
+    sendOnce: bool = False  # send once then auto-deactivate
     webhookUrl: HttpUrl
     isActive: bool = True
 
@@ -44,6 +45,7 @@ class MessageUpdate(BaseModel):
     sendTime: Optional[str] = Field(None, pattern=_TIME_PATTERN)
     sendTimes: Optional[List[str]] = Field(None, min_length=1, max_length=24)
     repeatCycle: Optional[str] = Field(None, pattern=r'^(daily|weekly)$')
+    sendOnce: Optional[bool] = None
     webhookUrl: Optional[HttpUrl] = None
     isActive: Optional[bool] = None
 
@@ -54,8 +56,9 @@ class MessageResponse(BaseModel):
     content: str
     daysOfWeek: List[int]
     sendTime: str
-    sendTimes: List[str] = []  # if empty, use [sendTime] when matching
+    sendTimes: List[str] = []
     repeatCycle: str = "weekly"
+    sendOnce: bool = False
     webhookUrl: str
     isActive: bool
     createdAt: datetime

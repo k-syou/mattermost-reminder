@@ -6,6 +6,7 @@ export interface Message {
   sendTime: string
   sendTimes?: string[]
   repeatCycle?: 'daily' | 'weekly'
+  sendOnce?: boolean
   webhookUrl: string
   isActive: boolean
   createdAt: string
@@ -18,6 +19,7 @@ export interface MessageCreate {
   sendTime: string
   sendTimes?: string[]
   repeatCycle?: 'daily' | 'weekly'
+  sendOnce?: boolean
   webhookUrl: string
   isActive?: boolean
 }
@@ -28,6 +30,7 @@ export interface MessageUpdate {
   sendTime?: string
   sendTimes?: string[]
   repeatCycle?: 'daily' | 'weekly'
+  sendOnce?: boolean
   webhookUrl?: string
   isActive?: boolean
 }

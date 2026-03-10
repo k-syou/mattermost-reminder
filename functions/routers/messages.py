@@ -137,6 +137,7 @@ async def create_message(
             "sendTime": message.sendTime,
             "sendTimes": send_times,
             "repeatCycle": repeat_cycle,
+            "sendOnce": getattr(message, "sendOnce", False),
             "webhookUrl": str(message.webhookUrl),
             "isActive": message.isActive,
             "createdAt": firestore.SERVER_TIMESTAMP,
@@ -156,6 +157,7 @@ async def create_message(
             sendTime=doc_data["sendTime"],
             sendTimes=_send_times_from_doc(doc_data),
             repeatCycle=_repeat_cycle_from_doc(doc_data),
+            sendOnce=doc_data.get("sendOnce", False),
             webhookUrl=doc_data["webhookUrl"],
             isActive=doc_data["isActive"],
             createdAt=_to_datetime(doc_data["createdAt"]),
@@ -188,6 +190,7 @@ async def list_messages(current_user: dict = Depends(get_current_user)):
                     sendTime=doc_data.get("sendTime", ""),
                     sendTimes=_send_times_from_doc(doc_data),
                     repeatCycle=_repeat_cycle_from_doc(doc_data),
+                    sendOnce=doc_data.get("sendOnce", False),
                     webhookUrl=doc_data.get("webhookUrl", ""),
                     isActive=doc_data.get("isActive", True),
                     createdAt=_to_datetime(doc_data.get("createdAt")),
@@ -348,6 +351,7 @@ async def get_message(
             sendTime=doc_data["sendTime"],
             sendTimes=_send_times_from_doc(doc_data),
             repeatCycle=_repeat_cycle_from_doc(doc_data),
+            sendOnce=doc_data.get("sendOnce", False),
             webhookUrl=doc_data["webhookUrl"],
             isActive=doc_data["isActive"],
             createdAt=_to_datetime(doc_data["createdAt"]),
@@ -401,6 +405,8 @@ async def update_message(
             update_data["sendTimes"] = message.sendTimes
         if message.repeatCycle is not None:
             update_data["repeatCycle"] = message.repeatCycle
+        if message.sendOnce is not None:
+            update_data["sendOnce"] = message.sendOnce
         if message.webhookUrl is not None:
             update_data["webhookUrl"] = str(message.webhookUrl)
         if message.isActive is not None:
@@ -417,6 +423,7 @@ async def update_message(
             sendTime=updated_data["sendTime"],
             sendTimes=_send_times_from_doc(updated_data),
             repeatCycle=_repeat_cycle_from_doc(updated_data),
+            sendOnce=updated_data.get("sendOnce", False),
             webhookUrl=updated_data["webhookUrl"],
             isActive=updated_data["isActive"],
             createdAt=_to_datetime(updated_data["createdAt"]),
@@ -491,6 +498,8 @@ async def send_message_now(
                 )
                 response.raise_for_status()
             _write_send_log(message_id, user_id, "success", content_preview=content_preview)
+            if doc_data.get("sendOnce"):
+                doc_ref.update({"isActive": False, "updatedAt": firestore.SERVER_TIMESTAMP})
             return {
                 "success": True,
                 "message": "Message sent successfully",

@@ -88,6 +88,7 @@ def send_scheduled_messages(event: scheduler_fn.ScheduledEvent) -> None:
                 "userId": data.get("userId", ""),
                 "content": data.get("content", ""),
                 "webhookUrl": data.get("webhookUrl", ""),
+                "sendOnce": data.get("sendOnce", False),
             })
 
     logger.info("Active messages=%s, matched for send=%s", all_active, len(messages_to_send))
@@ -106,6 +107,11 @@ def send_scheduled_messages(event: scheduler_fn.ScheduledEvent) -> None:
             response.raise_for_status()
             results.append({"id": message["id"], "status": "success", "sentAt": sent_at.isoformat()})
             _write_send_log(db, message["id"], message["userId"], "success", sent_at, content_preview=content_preview)
+            if message.get("sendOnce"):
+                db.collection("messages").document(message["id"]).update({
+                    "isActive": False,
+                    "updatedAt": firestore.SERVER_TIMESTAMP,
+                })
             logger.info("  sent messageId=%s success", message["id"])
         except Exception as e:
             results.append({"id": message["id"], "status": "error", "error": str(e), "sentAt": sent_at.isoformat()})

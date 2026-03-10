@@ -65,14 +65,20 @@
             <li v-for="message in messageStore.messages" :key="message.id" class="px-6 py-4">
               <div class="flex items-start justify-between">
                 <div class="flex-1">
-                  <div class="flex items-center">
+                  <div class="flex items-center flex-wrap gap-2">
                     <p class="text-sm font-medium text-gray-900">{{ message.content }}</p>
                     <span
                       :class="message.isActive
-                        ? 'ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800'
-                        : 'ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800'"
+                        ? 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800'
+                        : 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800'"
                     >
                       {{ message.isActive ? '활성' : '비활성' }}
+                    </span>
+                    <span
+                      v-if="message.sendOnce"
+                      class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800"
+                    >
+                      1회 작동
                     </span>
                   </div>
                   <div class="mt-2 text-sm text-gray-500">
@@ -243,16 +249,29 @@
                   <p class="mt-1 text-sm text-gray-500">여러 시간을 추가하면 해당 시간마다 전송됩니다. Asia/Seoul 기준.</p>
                 </div>
                 <WebhookSelector v-model="form.webhookUrl" />
-                <div class="flex items-center">
-                  <input
-                    id="isActive"
-                    v-model="form.isActive"
-                    type="checkbox"
-                    class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-                  />
-                  <label for="isActive" class="ml-2 block text-sm text-gray-900">
-                    활성화
-                  </label>
+                <div class="flex flex-col gap-2">
+                  <div class="flex items-center">
+                    <input
+                      id="sendOnce"
+                      v-model="form.sendOnce"
+                      type="checkbox"
+                      class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                    />
+                    <label for="sendOnce" class="ml-2 block text-sm text-gray-900">
+                      1회만 보내기 (전송 후 자동 비활성화)
+                    </label>
+                  </div>
+                  <div class="flex items-center">
+                    <input
+                      id="isActive"
+                      v-model="form.isActive"
+                      type="checkbox"
+                      class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                    />
+                    <label for="isActive" class="ml-2 block text-sm text-gray-900">
+                      활성화
+                    </label>
+                  </div>
                 </div>
               </div>
             </div>
@@ -359,6 +378,7 @@ const form = reactive({
   sendTime: '09:00',
   sendTimes: [] as string[],
   repeatCycle: 'weekly' as 'daily' | 'weekly',
+  sendOnce: false,
   webhookUrl: '',
   isActive: true
 })
@@ -381,6 +401,7 @@ const closeModal = () => {
   form.sendTime = '09:00'
   form.sendTimes = []
   form.repeatCycle = 'weekly'
+  form.sendOnce = false
   form.webhookUrl = ''
   form.isActive = true
 }
@@ -392,6 +413,7 @@ const editMessage = (message: Message) => {
   form.sendTime = message.sendTime
   form.sendTimes = message.sendTimes?.length ? [...message.sendTimes] : []
   form.repeatCycle = message.repeatCycle || 'weekly'
+  form.sendOnce = message.sendOnce ?? false
   form.webhookUrl = message.webhookUrl
   form.isActive = message.isActive
   showModal.value = true
@@ -406,6 +428,7 @@ const handleSubmit = async () => {
       sendTime: allTimes[0],
       sendTimes: allTimes,
       repeatCycle: form.repeatCycle,
+      sendOnce: form.sendOnce,
       webhookUrl: form.webhookUrl,
       isActive: form.isActive
     }
