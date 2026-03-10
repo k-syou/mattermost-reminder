@@ -63,10 +63,34 @@
         <div v-else class="bg-white shadow overflow-hidden sm:rounded-md">
           <ul class="divide-y divide-gray-200">
             <li v-for="message in messageStore.messages" :key="message.id" class="px-6 py-4">
-              <div class="flex items-start justify-between">
-                <div class="flex-1">
-                  <div class="flex items-center flex-wrap gap-2">
-                    <p class="text-sm font-medium text-gray-900">{{ message.content }}</p>
+              <div class="flex flex-col gap-2">
+                <div class="flex items-start justify-between">
+                  <div class="flex-1 min-w-0">
+                    <div class="flex items-center flex-wrap gap-2">
+                      <p class="text-sm font-medium text-gray-900">{{ message.content }}</p>
+                      <span
+                        v-if="message.sendOnce"
+                        class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800"
+                      >
+                        1회 작동
+                      </span>
+                    </div>
+                    <div class="mt-2 text-sm text-gray-500">
+                      <p>반복: {{ repeatCycleLabel(message.repeatCycle, message.daysOfWeek) }}</p>
+                      <p v-if="message.timeRangeStart && message.timeRangeEnd && (message.intervalSeconds ?? 0) > 0">
+                        시간: {{ message.timeRangeStart }}~{{ message.timeRangeEnd }}
+                        {{ formatInterval(message.intervalSeconds!) }} 간격
+                      </p>
+                      <p v-else>시간: {{ (message.sendTimes && message.sendTimes.length) ? message.sendTimes.join(', ') : message.sendTime }}</p>
+                      <p class="break-all">웹훅: {{ message.webhookUrl }}</p>
+                    </div>
+                  </div>
+                </div>
+                <div class="flex items-center justify-between pt-1 border-t border-gray-100">
+                  <p class="text-xs text-gray-400">
+                    생성일: {{ new Date(message.createdAt).toLocaleString('ko-KR') }}
+                  </p>
+                  <div class="flex items-center gap-2">
                     <button
                       type="button"
                       role="switch"
@@ -84,51 +108,31 @@
                         ]"
                       />
                     </button>
-                    <span
-                      v-if="message.sendOnce"
-                      class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800"
+                    <button
+                      type="button"
+                      class="p-1.5 text-indigo-600 hover:text-indigo-800 rounded"
+                      title="즉시 전송"
+                      @click="sendNow(message.id)"
                     >
-                      1회 작동
-                    </span>
+                      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>
+                    </button>
+                    <button
+                      type="button"
+                      class="p-1.5 text-gray-600 hover:text-gray-800 rounded"
+                      title="수정"
+                      @click="editMessage(message)"
+                    >
+                      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                    </button>
+                    <button
+                      type="button"
+                      class="p-1.5 text-red-600 hover:text-red-800 rounded"
+                      title="삭제"
+                      @click="deleteMessage(message.id)"
+                    >
+                      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                    </button>
                   </div>
-                  <div class="mt-2 text-sm text-gray-500">
-                    <p>반복: {{ repeatCycleLabel(message.repeatCycle, message.daysOfWeek) }}</p>
-                    <p v-if="message.timeRangeStart && message.timeRangeEnd && (message.intervalSeconds ?? 0) > 0">
-                      시간: {{ message.timeRangeStart }}~{{ message.timeRangeEnd }}
-                      {{ formatInterval(message.intervalSeconds!) }} 간격
-                    </p>
-                    <p v-else>시간: {{ (message.sendTimes && message.sendTimes.length) ? message.sendTimes.join(', ') : message.sendTime }}</p>
-                    <p class="break-all">웹훅: {{ message.webhookUrl }}</p>
-                  </div>
-                  <p class="text-xs text-gray-400 mt-2">
-                    생성일: {{ new Date(message.createdAt).toLocaleString('ko-KR') }}
-                  </p>
-                </div>
-                <div class="ml-4 flex items-center gap-2">
-                  <button
-                    type="button"
-                    class="p-1.5 text-indigo-600 hover:text-indigo-800 rounded"
-                    title="즉시 전송"
-                    @click="sendNow(message.id)"
-                  >
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>
-                  </button>
-                  <button
-                    type="button"
-                    class="p-1.5 text-gray-600 hover:text-gray-800 rounded"
-                    title="수정"
-                    @click="editMessage(message)"
-                  >
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                  </button>
-                  <button
-                    type="button"
-                    class="p-1.5 text-red-600 hover:text-red-800 rounded"
-                    title="삭제"
-                    @click="deleteMessage(message.id)"
-                  >
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                  </button>
                 </div>
               </div>
             </li>
