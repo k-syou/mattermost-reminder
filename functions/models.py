@@ -46,7 +46,7 @@ class MessageUpdate(BaseModel):
     content: Optional[str] = Field(None, min_length=1)
     daysOfWeek: Optional[List[int]] = Field(None, min_length=1, max_length=7)
     sendTime: Optional[str] = Field(None, pattern=_TIME_PATTERN)
-    sendTimes: Optional[List[str]] = Field(None, min_length=1, max_length=24)
+    sendTimes: Optional[List[str]] = Field(None, min_length=0, max_length=24)
     repeatCycle: Optional[str] = Field(None, pattern=r'^(daily|weekly|weekdays|weekend)$')
     sendOnce: Optional[bool] = None
     timeRangeStart: Optional[str] = Field(None, pattern=_TIME_PATTERN)
