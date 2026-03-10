@@ -82,7 +82,7 @@
                         {{ formatInterval(message.intervalSeconds!) }} 간격
                       </p>
                       <p v-else>시간: {{ (message.sendTimes && message.sendTimes.length) ? message.sendTimes.join(', ') : message.sendTime }}</p>
-                      <p class="break-all">웹훅: {{ message.webhookUrl }}</p>
+                      <p>웹훅: {{ getWebhookAlias(message.webhookUrl) }}</p>
                     </div>
                   </div>
                 </div>
@@ -140,7 +140,7 @@
         </div>
 
         <!-- 전송 이력 -->
-        <div v-if="!messageStore.loading" class="mt-8 bg-white shadow overflow-hidden sm:rounded-md">
+        <div v-if="!messageStore.loading" class="mt-5 bg-white shadow overflow-hidden sm:rounded-md">
           <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
             <h3 class="text-lg font-medium text-gray-900">전송 이력</h3>
             <button
@@ -470,6 +470,11 @@ function repeatCycleLabel(cycle?: string, daysOfWeek: number[] = []): string {
   if (cycle === 'weekdays') return '평일'
   if (cycle === 'weekend') return '주말'
   return '매주 ' + formatDaysOfWeek(daysOfWeek)
+}
+
+function getWebhookAlias(url: string): string {
+  const w = webhookStore.webhooks.find(wh => wh.url === url)
+  return w?.alias ?? url || '—'
 }
 
 const router = useRouter()
