@@ -28,6 +28,7 @@ def _repeat_cycle_from_doc(doc_data: dict) -> str:
 
 from dependencies import get_current_user
 from template_utils import render_message_template
+from message_utils import get_send_times_from_range
 from models import (
     MessageCreate,
     MessageUpdate,
@@ -129,6 +130,15 @@ async def create_message(
             if not (isinstance(t, str) and TIME_RE.match(t)):
                 raise HTTPException(status_code=400, detail="sendTimes must be HH:MM strings")
         repeat_cycle = message.repeatCycle or "weekly"
+        time_range_start = getattr(message, "timeRangeStart", None)
+        time_range_end = getattr(message, "timeRangeEnd", None)
+        interval_minutes = getattr(message, "intervalMinutes", None)
+        if time_range_start and time_range_end and interval_minutes is not None:
+            if not get_send_times_from_range(time_range_start, time_range_end, interval_minutes):
+                raise HTTPException(
+                    status_code=400,
+                    detail="timeRangeStart must be before timeRangeEnd (same day); intervalMinutes 5–60"
+                )
 
         message_data = {
             "userId": current_user["uid"],
@@ -143,6 +153,12 @@ async def create_message(
             "createdAt": firestore.SERVER_TIMESTAMP,
             "updatedAt": firestore.SERVER_TIMESTAMP
         }
+        if time_range_start is not None:
+            message_data["timeRangeStart"] = time_range_start
+        if time_range_end is not None:
+            message_data["timeRangeEnd"] = time_range_end
+        if interval_minutes is not None:
+            message_data["intervalMinutes"] = interval_minutes
 
         doc_ref = db.collection("messages").add(message_data)
         message_id = doc_ref[1].id
@@ -158,6 +174,9 @@ async def create_message(
             sendTimes=_send_times_from_doc(doc_data),
             repeatCycle=_repeat_cycle_from_doc(doc_data),
             sendOnce=doc_data.get("sendOnce", False),
+            timeRangeStart=doc_data.get("timeRangeStart"),
+            timeRangeEnd=doc_data.get("timeRangeEnd"),
+            intervalMinutes=doc_data.get("intervalMinutes"),
             webhookUrl=doc_data["webhookUrl"],
             isActive=doc_data["isActive"],
             createdAt=_to_datetime(doc_data["createdAt"]),
@@ -191,6 +210,9 @@ async def list_messages(current_user: dict = Depends(get_current_user)):
                     sendTimes=_send_times_from_doc(doc_data),
                     repeatCycle=_repeat_cycle_from_doc(doc_data),
                     sendOnce=doc_data.get("sendOnce", False),
+                    timeRangeStart=doc_data.get("timeRangeStart"),
+                    timeRangeEnd=doc_data.get("timeRangeEnd"),
+                    intervalMinutes=doc_data.get("intervalMinutes"),
                     webhookUrl=doc_data.get("webhookUrl", ""),
                     isActive=doc_data.get("isActive", True),
                     createdAt=_to_datetime(doc_data.get("createdAt")),
@@ -352,6 +374,9 @@ async def get_message(
             sendTimes=_send_times_from_doc(doc_data),
             repeatCycle=_repeat_cycle_from_doc(doc_data),
             sendOnce=doc_data.get("sendOnce", False),
+            timeRangeStart=doc_data.get("timeRangeStart"),
+            timeRangeEnd=doc_data.get("timeRangeEnd"),
+            intervalMinutes=doc_data.get("intervalMinutes"),
             webhookUrl=doc_data["webhookUrl"],
             isActive=doc_data["isActive"],
             createdAt=_to_datetime(doc_data["createdAt"]),
@@ -407,6 +432,20 @@ async def update_message(
             update_data["repeatCycle"] = message.repeatCycle
         if message.sendOnce is not None:
             update_data["sendOnce"] = message.sendOnce
+        if message.timeRangeStart is not None:
+            update_data["timeRangeStart"] = message.timeRangeStart
+        if message.timeRangeEnd is not None:
+            update_data["timeRangeEnd"] = message.timeRangeEnd
+        if message.intervalMinutes is not None:
+            update_data["intervalMinutes"] = message.intervalMinutes
+        if message.timeRangeStart and message.timeRangeEnd and message.intervalMinutes is not None:
+            if not get_send_times_from_range(
+                message.timeRangeStart, message.timeRangeEnd, message.intervalMinutes
+            ):
+                raise HTTPException(
+                    status_code=400,
+                    detail="timeRangeStart must be before timeRangeEnd; intervalMinutes 5–60"
+                )
         if message.webhookUrl is not None:
             update_data["webhookUrl"] = str(message.webhookUrl)
         if message.isActive is not None:
@@ -424,6 +463,9 @@ async def update_message(
             sendTimes=_send_times_from_doc(updated_data),
             repeatCycle=_repeat_cycle_from_doc(updated_data),
             sendOnce=updated_data.get("sendOnce", False),
+            timeRangeStart=updated_data.get("timeRangeStart"),
+            timeRangeEnd=updated_data.get("timeRangeEnd"),
+            intervalMinutes=updated_data.get("intervalMinutes"),
             webhookUrl=updated_data["webhookUrl"],
             isActive=updated_data["isActive"],
             createdAt=_to_datetime(updated_data["createdAt"]),

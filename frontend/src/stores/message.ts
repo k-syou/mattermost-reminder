@@ -44,6 +44,9 @@ export const useMessageStore = defineStore('message', () => {
     sendTimes?: string[]
     repeatCycle?: 'daily' | 'weekly'
     sendOnce?: boolean
+    timeRangeStart?: string
+    timeRangeEnd?: string
+    intervalMinutes?: number
     webhookUrl: string
     isActive?: boolean
   }) => {
@@ -81,6 +84,9 @@ export const useMessageStore = defineStore('message', () => {
     sendTimes: string[]
     repeatCycle: 'daily' | 'weekly'
     sendOnce: boolean
+    timeRangeStart: string
+    timeRangeEnd: string
+    intervalMinutes: number
     webhookUrl: string
     isActive: boolean
   }>) => {

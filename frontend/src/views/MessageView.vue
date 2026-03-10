@@ -83,7 +83,10 @@
                   </div>
                   <div class="mt-2 text-sm text-gray-500">
                     <p>반복: {{ message.repeatCycle === 'daily' ? '매일' : '매주 ' + formatDaysOfWeek(message.daysOfWeek) }}</p>
-                    <p>시간: {{ (message.sendTimes && message.sendTimes.length) ? message.sendTimes.join(', ') : message.sendTime }}</p>
+                    <p v-if="message.timeRangeStart && message.timeRangeEnd && message.intervalMinutes != null">
+                      시간: {{ message.timeRangeStart }}~{{ message.timeRangeEnd }} {{ message.intervalMinutes }}분 간격
+                    </p>
+                    <p v-else>시간: {{ (message.sendTimes && message.sendTimes.length) ? message.sendTimes.join(', ') : message.sendTime }}</p>
                     <p class="break-all">웹훅: {{ message.webhookUrl }}</p>
                   </div>
                   <p class="text-xs text-gray-400 mt-2">
@@ -248,6 +251,45 @@
                   </div>
                   <p class="mt-1 text-sm text-gray-500">여러 시간을 추가하면 해당 시간마다 전송됩니다. Asia/Seoul 기준.</p>
                 </div>
+                <div class="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                  <p class="text-sm font-medium text-gray-700 mb-2">특정 시간대 N분 간격 반복</p>
+                  <p class="text-xs text-gray-500 mb-2">시작~종료 시간 사이를 지정한 간격(분)마다 전송합니다. 설정 시 위 전송 시간 목록보다 우선합니다.</p>
+                  <div class="grid grid-cols-3 gap-2 items-end">
+                    <div>
+                      <label for="timeRangeStart" class="block text-xs text-gray-600">시작</label>
+                      <input
+                        id="timeRangeStart"
+                        v-model="form.timeRangeStart"
+                        type="time"
+                        class="mt-0.5 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label for="timeRangeEnd" class="block text-xs text-gray-600">종료</label>
+                      <input
+                        id="timeRangeEnd"
+                        v-model="form.timeRangeEnd"
+                        type="time"
+                        class="mt-0.5 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label for="intervalMinutes" class="block text-xs text-gray-600">간격(분)</label>
+                      <select
+                        id="intervalMinutes"
+                        v-model.number="form.intervalMinutes"
+                        class="mt-0.5 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                      >
+                        <option :value="undefined">미사용</option>
+                        <option :value="5">5분</option>
+                        <option :value="10">10분</option>
+                        <option :value="15">15분</option>
+                        <option :value="30">30분</option>
+                        <option :value="60">60분</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
                 <WebhookSelector v-model="form.webhookUrl" />
                 <div class="flex flex-col gap-2">
                   <div class="flex items-center">
@@ -379,6 +421,9 @@ const form = reactive({
   sendTimes: [] as string[],
   repeatCycle: 'weekly' as 'daily' | 'weekly',
   sendOnce: false,
+  timeRangeStart: '' as string,
+  timeRangeEnd: '' as string,
+  intervalMinutes: undefined as number | undefined,
   webhookUrl: '',
   isActive: true
 })
@@ -402,6 +447,9 @@ const closeModal = () => {
   form.sendTimes = []
   form.repeatCycle = 'weekly'
   form.sendOnce = false
+  form.timeRangeStart = ''
+  form.timeRangeEnd = ''
+  form.intervalMinutes = undefined
   form.webhookUrl = ''
   form.isActive = true
 }
@@ -414,6 +462,9 @@ const editMessage = (message: Message) => {
   form.sendTimes = message.sendTimes?.length ? [...message.sendTimes] : []
   form.repeatCycle = message.repeatCycle || 'weekly'
   form.sendOnce = message.sendOnce ?? false
+  form.timeRangeStart = message.timeRangeStart ?? ''
+  form.timeRangeEnd = message.timeRangeEnd ?? ''
+  form.intervalMinutes = message.intervalMinutes
   form.webhookUrl = message.webhookUrl
   form.isActive = message.isActive
   showModal.value = true
@@ -421,14 +472,20 @@ const editMessage = (message: Message) => {
 
 const handleSubmit = async () => {
   try {
-    const allTimes = form.sendTimes.length ? form.sendTimes : [form.sendTime]
+    const useRange = form.timeRangeStart && form.timeRangeEnd && form.intervalMinutes != null
+    const allTimes = useRange ? [] : (form.sendTimes.length ? form.sendTimes : [form.sendTime])
     const payload = {
       content: form.content,
       daysOfWeek: form.repeatCycle === 'daily' ? [0, 1, 2, 3, 4, 5, 6] : form.daysOfWeek,
-      sendTime: allTimes[0],
+      sendTime: useRange ? form.timeRangeStart : allTimes[0],
       sendTimes: allTimes,
       repeatCycle: form.repeatCycle,
       sendOnce: form.sendOnce,
+      ...(useRange && {
+        timeRangeStart: form.timeRangeStart,
+        timeRangeEnd: form.timeRangeEnd,
+        intervalMinutes: form.intervalMinutes
+      }),
       webhookUrl: form.webhookUrl,
       isActive: form.isActive
     }

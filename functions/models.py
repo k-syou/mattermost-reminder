@@ -34,7 +34,10 @@ class MessageCreate(BaseModel):
     sendTime: str = Field(..., pattern=_TIME_PATTERN)
     sendTimes: Optional[List[str]] = None
     repeatCycle: Optional[str] = Field(default="weekly", pattern=r'^(daily|weekly)$')
-    sendOnce: bool = False  # send once then auto-deactivate
+    sendOnce: bool = False
+    timeRangeStart: Optional[str] = Field(None, pattern=_TIME_PATTERN)  # N분 간격 반복 시작
+    timeRangeEnd: Optional[str] = Field(None, pattern=_TIME_PATTERN)    # N분 간격 반복 종료
+    intervalMinutes: Optional[int] = Field(None, ge=5, le=60)          # 5,10,15,30,60
     webhookUrl: HttpUrl
     isActive: bool = True
 
@@ -46,6 +49,9 @@ class MessageUpdate(BaseModel):
     sendTimes: Optional[List[str]] = Field(None, min_length=1, max_length=24)
     repeatCycle: Optional[str] = Field(None, pattern=r'^(daily|weekly)$')
     sendOnce: Optional[bool] = None
+    timeRangeStart: Optional[str] = Field(None, pattern=_TIME_PATTERN)
+    timeRangeEnd: Optional[str] = Field(None, pattern=_TIME_PATTERN)
+    intervalMinutes: Optional[int] = Field(None, ge=5, le=60)
     webhookUrl: Optional[HttpUrl] = None
     isActive: Optional[bool] = None
 
@@ -59,6 +65,9 @@ class MessageResponse(BaseModel):
     sendTimes: List[str] = []
     repeatCycle: str = "weekly"
     sendOnce: bool = False
+    timeRangeStart: Optional[str] = None
+    timeRangeEnd: Optional[str] = None
+    intervalMinutes: Optional[int] = None
     webhookUrl: str
     isActive: bool
     createdAt: datetime
