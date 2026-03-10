@@ -76,8 +76,8 @@
                     </span>
                   </div>
                   <div class="mt-2 text-sm text-gray-500">
-                    <p>요일: {{ formatDaysOfWeek(message.daysOfWeek) }}</p>
-                    <p>시간: {{ message.sendTime }}</p>
+                    <p>반복: {{ message.repeatCycle === 'daily' ? '매일' : '매주 ' + formatDaysOfWeek(message.daysOfWeek) }}</p>
+                    <p>시간: {{ (message.sendTimes && message.sendTimes.length) ? message.sendTimes.join(', ') : message.sendTime }}</p>
                     <p class="break-all">웹훅: {{ message.webhookUrl }}</p>
                   </div>
                   <p class="text-xs text-gray-400 mt-2">
@@ -208,7 +208,40 @@
                   />
                 </div>
                 <DaySelector v-model="form.daysOfWeek" />
-                <TimeSelector v-model="form.sendTime" />
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">반복 주기</label>
+                  <select
+                    v-model="form.repeatCycle"
+                    class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                  >
+                    <option value="weekly">매주 (요일 선택 기준)</option>
+                    <option value="daily">매일</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">전송 시간</label>
+                  <div class="flex gap-2 items-end">
+                    <TimeSelector v-model="form.sendTime" class="flex-1" />
+                    <button
+                      type="button"
+                      @click="addSendTime"
+                      class="px-3 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                    >
+                      시간 추가
+                    </button>
+                  </div>
+                  <div v-if="form.sendTimes.length > 0" class="mt-2 flex flex-wrap gap-2">
+                    <span
+                      v-for="(t, i) in form.sendTimes"
+                      :key="i"
+                      class="inline-flex items-center gap-1 px-2 py-1 rounded bg-gray-100 text-sm"
+                    >
+                      {{ t }}
+                      <button type="button" @click="removeSendTime(i)" class="text-gray-500 hover:text-red-600">&times;</button>
+                    </span>
+                  </div>
+                  <p class="mt-1 text-sm text-gray-500">여러 시간을 추가하면 해당 시간마다 전송됩니다. Asia/Seoul 기준.</p>
+                </div>
                 <WebhookSelector v-model="form.webhookUrl" />
                 <div class="flex items-center">
                   <input
@@ -226,7 +259,7 @@
             <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
               <button
                 type="submit"
-                :disabled="messageStore.loading || form.daysOfWeek.length === 0"
+                :disabled="messageStore.loading || (form.repeatCycle === 'weekly' && form.daysOfWeek.length === 0)"
                 class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-indigo-600 text-base font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:ml-3 sm:w-auto sm:text-sm disabled:opacity-50"
               >
                 {{ messageStore.loading ? '처리 중...' : (editingMessage ? '수정' : '추가') }}
@@ -323,17 +356,31 @@ const editingMessage = ref<Message | null>(null)
 const form = reactive({
   content: '',
   daysOfWeek: [] as number[],
-  sendTime: '',
+  sendTime: '09:00',
+  sendTimes: [] as string[],
+  repeatCycle: 'weekly' as 'daily' | 'weekly',
   webhookUrl: '',
   isActive: true
 })
+
+const addSendTime = () => {
+  if (form.sendTime && !form.sendTimes.includes(form.sendTime)) {
+    form.sendTimes.push(form.sendTime)
+  }
+}
+
+const removeSendTime = (index: number) => {
+  form.sendTimes.splice(index, 1)
+}
 
 const closeModal = () => {
   showModal.value = false
   editingMessage.value = null
   form.content = ''
   form.daysOfWeek = []
-  form.sendTime = ''
+  form.sendTime = '09:00'
+  form.sendTimes = []
+  form.repeatCycle = 'weekly'
   form.webhookUrl = ''
   form.isActive = true
 }
@@ -343,6 +390,8 @@ const editMessage = (message: Message) => {
   form.content = message.content
   form.daysOfWeek = [...message.daysOfWeek]
   form.sendTime = message.sendTime
+  form.sendTimes = message.sendTimes?.length ? [...message.sendTimes] : []
+  form.repeatCycle = message.repeatCycle || 'weekly'
   form.webhookUrl = message.webhookUrl
   form.isActive = message.isActive
   showModal.value = true
@@ -350,10 +399,20 @@ const editMessage = (message: Message) => {
 
 const handleSubmit = async () => {
   try {
+    const allTimes = form.sendTimes.length ? form.sendTimes : [form.sendTime]
+    const payload = {
+      content: form.content,
+      daysOfWeek: form.repeatCycle === 'daily' ? [0, 1, 2, 3, 4, 5, 6] : form.daysOfWeek,
+      sendTime: allTimes[0],
+      sendTimes: allTimes,
+      repeatCycle: form.repeatCycle,
+      webhookUrl: form.webhookUrl,
+      isActive: form.isActive
+    }
     if (editingMessage.value) {
-      await messageStore.updateMessage(editingMessage.value.id, form)
+      await messageStore.updateMessage(editingMessage.value.id, payload)
     } else {
-      await messageStore.createMessage(form)
+      await messageStore.createMessage(payload)
     }
     closeModal()
   } catch (error) {

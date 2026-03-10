@@ -3,12 +3,28 @@ Message CRUD API endpoints
 """
 import json
 import os
+import re
 from fastapi import APIRouter, HTTPException, Depends
 from firebase_admin import firestore
 from typing import List, Any
 from datetime import datetime, timezone
 import httpx
 import pytz
+
+TIME_RE = re.compile(r"^([0-1][0-9]|2[0-3]):[0-5][0-9]$")
+
+
+def _send_times_from_doc(doc_data: dict) -> List[str]:
+    times = doc_data.get("sendTimes")
+    if times and isinstance(times, list):
+        return [t for t in times if isinstance(t, str) and TIME_RE.match(t)]
+    st = doc_data.get("sendTime")
+    return [st] if st and isinstance(st, str) else []
+
+
+def _repeat_cycle_from_doc(doc_data: dict) -> str:
+    r = doc_data.get("repeatCycle")
+    return r if r in ("daily", "weekly") else "weekly"
 
 from dependencies import get_current_user
 from template_utils import render_message_template
@@ -108,31 +124,38 @@ async def create_message(
                 status_code=400,
                 detail="daysOfWeek must contain values between 0 (Sunday) and 6 (Saturday)"
             )
-        
+        send_times = message.sendTimes if message.sendTimes else [message.sendTime]
+        for t in send_times:
+            if not (isinstance(t, str) and TIME_RE.match(t)):
+                raise HTTPException(status_code=400, detail="sendTimes must be HH:MM strings")
+        repeat_cycle = message.repeatCycle or "weekly"
+
         message_data = {
             "userId": current_user["uid"],
             "content": message.content,
             "daysOfWeek": message.daysOfWeek,
             "sendTime": message.sendTime,
+            "sendTimes": send_times,
+            "repeatCycle": repeat_cycle,
             "webhookUrl": str(message.webhookUrl),
             "isActive": message.isActive,
             "createdAt": firestore.SERVER_TIMESTAMP,
             "updatedAt": firestore.SERVER_TIMESTAMP
         }
-        
+
         doc_ref = db.collection("messages").add(message_data)
         message_id = doc_ref[1].id
-        
-        # Fetch the created document
+
         doc = db.collection("messages").document(message_id).get()
         doc_data = doc.to_dict()
-        
         return MessageResponse(
             id=message_id,
             userId=doc_data["userId"],
             content=doc_data["content"],
             daysOfWeek=doc_data["daysOfWeek"],
             sendTime=doc_data["sendTime"],
+            sendTimes=_send_times_from_doc(doc_data),
+            repeatCycle=_repeat_cycle_from_doc(doc_data),
             webhookUrl=doc_data["webhookUrl"],
             isActive=doc_data["isActive"],
             createdAt=_to_datetime(doc_data["createdAt"]),
@@ -163,6 +186,8 @@ async def list_messages(current_user: dict = Depends(get_current_user)):
                     content=doc_data.get("content", ""),
                     daysOfWeek=doc_data.get("daysOfWeek", []),
                     sendTime=doc_data.get("sendTime", ""),
+                    sendTimes=_send_times_from_doc(doc_data),
+                    repeatCycle=_repeat_cycle_from_doc(doc_data),
                     webhookUrl=doc_data.get("webhookUrl", ""),
                     isActive=doc_data.get("isActive", True),
                     createdAt=_to_datetime(doc_data.get("createdAt")),
@@ -321,6 +346,8 @@ async def get_message(
             content=doc_data["content"],
             daysOfWeek=doc_data["daysOfWeek"],
             sendTime=doc_data["sendTime"],
+            sendTimes=_send_times_from_doc(doc_data),
+            repeatCycle=_repeat_cycle_from_doc(doc_data),
             webhookUrl=doc_data["webhookUrl"],
             isActive=doc_data["isActive"],
             createdAt=_to_datetime(doc_data["createdAt"]),
@@ -352,15 +379,17 @@ async def update_message(
         if doc_data["userId"] != current_user["uid"]:
             raise HTTPException(status_code=403, detail="Access denied")
         
-        # Validate daysOfWeek if provided
         if message.daysOfWeek is not None:
             if not all(0 <= day <= 6 for day in message.daysOfWeek):
                 raise HTTPException(
                     status_code=400,
                     detail="daysOfWeek must contain values between 0 (Sunday) and 6 (Saturday)"
                 )
-        
-        # Prepare update data
+        if message.sendTimes is not None:
+            for t in message.sendTimes:
+                if not (isinstance(t, str) and TIME_RE.match(t)):
+                    raise HTTPException(status_code=400, detail="sendTimes must be HH:MM strings")
+
         update_data = {"updatedAt": firestore.SERVER_TIMESTAMP}
         if message.content is not None:
             update_data["content"] = message.content
@@ -368,23 +397,26 @@ async def update_message(
             update_data["daysOfWeek"] = message.daysOfWeek
         if message.sendTime is not None:
             update_data["sendTime"] = message.sendTime
+        if message.sendTimes is not None:
+            update_data["sendTimes"] = message.sendTimes
+        if message.repeatCycle is not None:
+            update_data["repeatCycle"] = message.repeatCycle
         if message.webhookUrl is not None:
             update_data["webhookUrl"] = str(message.webhookUrl)
         if message.isActive is not None:
             update_data["isActive"] = message.isActive
-        
+
         doc_ref.update(update_data)
-        
-        # Fetch updated document
         updated_doc = doc_ref.get()
         updated_data = updated_doc.to_dict()
-        
         return MessageResponse(
             id=updated_doc.id,
             userId=updated_data["userId"],
             content=updated_data["content"],
             daysOfWeek=updated_data["daysOfWeek"],
             sendTime=updated_data["sendTime"],
+            sendTimes=_send_times_from_doc(updated_data),
+            repeatCycle=_repeat_cycle_from_doc(updated_data),
             webhookUrl=updated_data["webhookUrl"],
             isActive=updated_data["isActive"],
             createdAt=_to_datetime(updated_data["createdAt"]),

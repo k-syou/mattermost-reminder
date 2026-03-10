@@ -73,14 +73,19 @@ def send_scheduled_messages(event: scheduler_fn.ScheduledEvent) -> None:
         all_active += 1
         data = doc.to_dict() or {}
         days_of_week = data.get("daysOfWeek", [])
-        send_time = data.get("sendTime", "")
-        user_id = data.get("userId", "")
-        matched = current_day in days_of_week and send_time == current_time
-        logger.info("  message %s: daysOfWeek=%s sendTime=%s -> match=%s", doc.id, days_of_week, send_time, matched)
+        send_times = data.get("sendTimes")
+        if not send_times or not isinstance(send_times, list):
+            send_times = [data.get("sendTime", "")]
+        send_times = [t for t in send_times if isinstance(t, str) and len(t) == 5]
+        repeat_cycle = data.get("repeatCycle", "weekly")
+        day_ok = (repeat_cycle == "daily") or (current_day in days_of_week)
+        time_ok = current_time in send_times
+        matched = day_ok and time_ok
+        logger.info("  message %s: daysOfWeek=%s sendTimes=%s repeatCycle=%s -> match=%s", doc.id, days_of_week, send_times, repeat_cycle, matched)
         if matched:
             messages_to_send.append({
                 "id": doc.id,
-                "userId": user_id,
+                "userId": data.get("userId", ""),
                 "content": data.get("content", ""),
                 "webhookUrl": data.get("webhookUrl", ""),
             })
