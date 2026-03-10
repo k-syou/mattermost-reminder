@@ -16,6 +16,16 @@
               <router-link to="/messages" class="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">메시지 관리</router-link>
             </div>
           </div>
+          <div class="flex items-center">
+            <span class="text-sm text-gray-700 mr-4">{{ authStore.user?.email }}</span>
+            <button
+              type="button"
+              @click="handleLogout"
+              class="bg-white py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50"
+            >
+              로그아웃
+            </button>
+          </div>
         </div>
       </div>
     </nav>
@@ -156,11 +166,24 @@
 
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { useWebhookStore } from '@/stores/webhook'
+import { useAuthStore } from '@/stores/auth'
 import WebhookGuideModal from '@/components/WebhookGuideModal.vue'
 import type { Webhook } from '@/types/webhook'
 
+const router = useRouter()
 const webhookStore = useWebhookStore()
+const authStore = useAuthStore()
+
+const handleLogout = async () => {
+  try {
+    await authStore.logout()
+    router.push('/login')
+  } catch (error) {
+    console.error('Logout error:', error)
+  }
+}
 
 const showModal = ref(false)
 const showGuideModal = ref(false)

@@ -16,6 +16,16 @@
               <router-link to="/messages" class="border-indigo-500 text-gray-900 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">메시지 관리</router-link>
             </div>
           </div>
+          <div class="flex items-center">
+            <span class="text-sm text-gray-700 mr-4">{{ authStore.user?.email }}</span>
+            <button
+              type="button"
+              @click="handleLogout"
+              class="bg-white py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50"
+            >
+              로그아웃
+            </button>
+          </div>
         </div>
       </div>
     </nav>
@@ -277,8 +287,10 @@
 
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { useMessageStore } from '@/stores/message'
 import { useWebhookStore } from '@/stores/webhook'
+import { useAuthStore } from '@/stores/auth'
 import DaySelector from '@/components/DaySelector.vue'
 import TimeSelector from '@/components/TimeSelector.vue'
 import WebhookSelector from '@/components/WebhookSelector.vue'
@@ -286,8 +298,19 @@ import MessageTemplateGuideModal from '@/components/MessageTemplateGuideModal.vu
 import { formatDaysOfWeek } from '@/utils/format'
 import type { Message } from '@/types/message'
 
+const router = useRouter()
 const messageStore = useMessageStore()
 const webhookStore = useWebhookStore()
+const authStore = useAuthStore()
+
+const handleLogout = async () => {
+  try {
+    await authStore.logout()
+    router.push('/login')
+  } catch (error) {
+    console.error('Logout error:', error)
+  }
+}
 
 const showModal = ref(false)
 const showAIModal = ref(false)
