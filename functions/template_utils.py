@@ -1,6 +1,16 @@
 import re
-from datetime import datetime
-from typing import Callable
+from datetime import datetime, timezone
+from typing import Callable, Union
+
+# Support Firestore Timestamp or datetime as "now"
+def _normalize_dt(now: Union[datetime, None]) -> datetime:
+    if now is None:
+        return datetime.now(timezone.utc)
+    if isinstance(now, datetime):
+        return now
+    if hasattr(now, "timestamp"):
+        return datetime.fromtimestamp(now.timestamp(), tz=timezone.utc)
+    return datetime.now(timezone.utc)
 
 
 _TOKEN_RENDERERS: list[tuple[str, Callable[[datetime], str]]] = [
@@ -27,6 +37,10 @@ def format_dt_pattern(now: datetime, pattern: str) -> str:
     if not p:
         raise ValueError("empty pattern")
 
+    # Fallback for common pattern so it always works
+    if p == "yyyy-MM-dd HH:mm" or p.replace(" ", "") == "yyyy-MM-ddHH:mm":
+        return f"{now.year:04d}-{now.month:02d}-{now.day:02d} {now.hour:02d}:{now.minute:02d}"
+
     out: list[str] = []
     i = 0
     used_token = False
@@ -50,19 +64,26 @@ def format_dt_pattern(now: datetime, pattern: str) -> str:
 _BRACE_PATTERN = re.compile(r"\{([^{}]+)\}")
 
 
-def render_message_template(content: str, now: datetime) -> str:
+def render_message_template(content: str, now: Union[datetime, None]) -> str:
     """
     Replace {pattern} placeholders in message content with formatted datetime.
     Unrecognized/invalid patterns are left as-is.
     """
+    if content is None:
+        content = ""
+    content = str(content)
     if not content or "{" not in content:
         return content
 
+    dt = _normalize_dt(now)
+
     def _repl(match: re.Match) -> str:
         raw = match.group(0)
-        pat = match.group(1)
+        pat = (match.group(1) or "").strip()
+        if not pat:
+            return raw
         try:
-            return format_dt_pattern(now, pat)
+            return format_dt_pattern(dt, pat)
         except Exception:
             return raw
 
