@@ -86,7 +86,7 @@
                     </div>
                   </div>
                 </div>
-                <div class="flex items-center justify-between pt-1 border-t border-gray-100">
+                <div class="flex items-center justify-between pt-2 border-t border-gray-100">
                   <p class="text-xs text-gray-400">
                     생성일: {{ new Date(message.createdAt).toLocaleString('ko-KR') }}
                   </p>
@@ -474,7 +474,7 @@ function repeatCycleLabel(cycle?: string, daysOfWeek: number[] = []): string {
 
 function getWebhookAlias(url: string): string {
   const w = webhookStore.webhooks.find(wh => wh.url === url)
-  return w?.alias ?? url || '—'
+  return (w?.alias ?? url) || '—'
 }
 
 const router = useRouter()

@@ -281,11 +281,15 @@ AI_SYSTEM_PROMPT = """You are a helper for creating Mattermost reminder messages
 
 Given the user's prompt, output a JSON object with:
 - "content": string, the message body in Markdown. Convert the user's intent into a clear, formatted reminder message. The entire "content" must be written in Korean only.
-- "daysOfWeek": (optional) array of integers 0-6 where 0=Sunday, 1=Monday, ..., 6=Saturday. Include only if the user mentions specific weekdays.
-- "sendTime": (optional) string "HH:MM" in 24h format (e.g. "09:00", "13:30"). Include only if the user mentions a single fixed time (not a range).
-- "timeRangeStart": (optional) string "HH:MM" 24h. Include only when the user asks for repeated sends within a time range (e.g. "09:00부터 18:00까지 N분마다").
-- "timeRangeEnd": (optional) string "HH:MM" 24h, must be after timeRangeStart on the same day.
-- "intervalSeconds": (optional) integer 1-86400. Use when the user specifies an interval (e.g. "10분마다" -> 600, "1시간마다" -> 3600). Omit if only fixed sendTime is used.
+- "daysOfWeek": (optional) array of integers 0-6 where 0=Sunday, 1=Monday, ..., 6=Saturday. Include when the user mentions weekdays (e.g. "매주 월, 화" -> [1, 2]).
+- "sendTime": (optional) string "HH:MM" in 24h format. Use ONLY when the user specifies a single fixed time (e.g. "오전 9시에"). Do NOT use sendTime when the user specifies a time range with an interval.
+- "timeRangeStart": (optional) string "HH:MM" 24h. Use when the user says a start time of a range: "X시부터", "X시~", "오전 X시부터" etc. (e.g. "오전 10시부터" -> "10:00").
+- "timeRangeEnd": (optional) string "HH:MM" 24h, must be after timeRangeStart. Use when the user says an end time: "Y시까지", "~Y시", "오후 Y시까지" etc. (e.g. "오후 3시까지" -> "15:00").
+- "intervalSeconds": (optional) integer 1-86400. Use when the user specifies an interval within a time range: "N분마다", "N초 간격", "N분 N초 간격", "N시간마다". Convert to seconds: "13분 35초" -> 13*60+35 = 815, "10분마다" -> 600, "1시간마다" -> 3600.
+
+IMPORTANT - Time range + interval (특정시간 반복):
+When the user mentions BOTH a time range (from A to B) AND an interval (every N min/sec), you MUST output timeRangeStart, timeRangeEnd, and intervalSeconds together. Do NOT use sendTime in that case.
+Example: "매주 월, 화에 오전 10시부터 오후 3시까지 13분 35초 간격으로 알려줘" -> daysOfWeek: [1, 2], timeRangeStart: "10:00", timeRangeEnd: "15:00", intervalSeconds: 815, and omit sendTime.
 
 Language and unclear input:
 - Always write "content" in Korean. Never respond in English or other languages.
