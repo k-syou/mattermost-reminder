@@ -67,7 +67,7 @@
                 <div class="flex items-start justify-between">
                   <div class="flex-1 min-w-0">
                     <div class="flex items-center flex-wrap gap-2">
-                      <p class="text-sm font-medium text-gray-900">{{ message.content }}</p>
+                      <p class="text-sm font-medium text-gray-900">{{ message.content.length > 30 ? message.content.slice(0, 30) + '…' : message.content }}</p>
                       <span
                         v-if="message.sendOnce"
                         class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800"
@@ -104,7 +104,7 @@
                       <span
                         :class="[
                           'pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition',
-                          message.isActive ? 'translate-x-5' : 'translate-x-1'
+                          message.isActive ? 'translate-x-5' : 'translate-x-0.5'
                         ]"
                       />
                     </button>

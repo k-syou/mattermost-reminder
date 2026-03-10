@@ -91,7 +91,6 @@ export const useMessageStore = defineStore('message', () => {
     isActive: boolean
   }>) => {
     try {
-      loading.value = true
       error.value = null
       const token = await authStore.getIdToken()
       if (!token) throw new Error('인증 토큰이 없습니다.')
@@ -115,8 +114,6 @@ export const useMessageStore = defineStore('message', () => {
     } catch (err: any) {
       error.value = err.message
       throw err
-    } finally {
-      loading.value = false
     }
   }
 
