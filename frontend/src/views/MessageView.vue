@@ -209,12 +209,15 @@
                     </div>
                   </div>
                   <textarea
+                    ref="contentTextareaRef"
                     id="content"
                     v-model="form.content"
                     rows="4"
                     required
-                    class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                    class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm resize-none overflow-y-auto"
                     placeholder="Markdown 형식 지원"
+                    style="min-height: 100px"
+                    @input="resizeContentTextarea"
                   />
                 </div>
                 <DaySelector v-model="form.daysOfWeek" :disabled="form.repeatCycle === 'daily' || form.repeatCycle === 'weekdays' || form.repeatCycle === 'weekend'" />
@@ -428,7 +431,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, watch, nextTick, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useMessageStore } from '@/stores/message'
 import { useWebhookStore } from '@/stores/webhook'
@@ -479,6 +482,7 @@ const aiPrompt = ref('')
 const aiLoading = ref(false)
 const aiError = ref('')
 const editingMessage = ref<Message | null>(null)
+const contentTextareaRef = ref<HTMLTextAreaElement | null>(null)
 
 const form = reactive({
   content: '',
@@ -496,6 +500,18 @@ const form = reactive({
   webhookUrl: '',
   isActive: true
 })
+
+function resizeContentTextarea() {
+  nextTick(() => {
+    const el = contentTextareaRef.value
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = `${Math.max(100, el.scrollHeight)}px`
+  })
+}
+
+watch(() => form.content, () => resizeContentTextarea())
+watch(showModal, (open) => { if (open) resizeContentTextarea() })
 
 const timeRangeValid = computed(() => {
   const sec = (form.intervalHours || 0) * 3600 + (form.intervalMins || 0) * 60 + (form.intervalSecs || 0)
