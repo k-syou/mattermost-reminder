@@ -101,7 +101,15 @@ async def _run_send_scheduled_messages():
         use_seconds = any(len(t) == 8 for t in send_times) if send_times else False
         current_time = current_time_hms if use_seconds else current_time_hm
         repeat_cycle = data.get("repeatCycle", "weekly")
-        day_ok = (repeat_cycle == "daily") or (current_day in days_of_week)
+        if repeat_cycle == "daily":
+            effective_days = list(range(7))
+        elif repeat_cycle == "weekdays":
+            effective_days = [1, 2, 3, 4, 5]
+        elif repeat_cycle == "weekend":
+            effective_days = [0, 6]
+        else:
+            effective_days = days_of_week
+        day_ok = current_day in effective_days
         time_ok = current_time in send_times
         matched = day_ok and time_ok
         logger.info(

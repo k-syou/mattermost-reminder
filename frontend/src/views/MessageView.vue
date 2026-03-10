@@ -82,7 +82,7 @@
                     </span>
                   </div>
                   <div class="mt-2 text-sm text-gray-500">
-                    <p>반복: {{ message.repeatCycle === 'daily' ? '매일' : '매주 ' + formatDaysOfWeek(message.daysOfWeek) }}</p>
+                    <p>반복: {{ repeatCycleLabel(message.repeatCycle, message.daysOfWeek) }}</p>
                     <p v-if="message.timeRangeStart && message.timeRangeEnd && (message.intervalSeconds ?? 0) > 0">
                       시간: {{ message.timeRangeStart }}~{{ message.timeRangeEnd }}
                       {{ formatInterval(message.intervalSeconds!) }} 간격
@@ -217,7 +217,7 @@
                     placeholder="Markdown 형식 지원"
                   />
                 </div>
-                <DaySelector v-model="form.daysOfWeek" :disabled="form.repeatCycle === 'daily'" />
+                <DaySelector v-model="form.daysOfWeek" :disabled="form.repeatCycle === 'daily' || form.repeatCycle === 'weekdays' || form.repeatCycle === 'weekend'" />
                 <div>
                   <label class="block text-sm font-medium text-gray-700 mb-1">반복 주기</label>
                   <select
@@ -227,8 +227,12 @@
                   >
                     <option value="weekly">매주 (요일 선택 기준)</option>
                     <option value="daily">매일</option>
+                    <option value="weekdays">평일</option>
+                    <option value="weekend">주말</option>
                   </select>
                   <p v-if="form.repeatCycle === 'daily'" class="mt-1 text-sm text-gray-500">매일 선택 시 모든 요일이 자동 적용됩니다.</p>
+                  <p v-else-if="form.repeatCycle === 'weekdays'" class="mt-1 text-sm text-gray-500">평일(월~금)이 자동 적용됩니다.</p>
+                  <p v-else-if="form.repeatCycle === 'weekend'" class="mt-1 text-sm text-gray-500">주말(토, 일)이 자동 적용됩니다.</p>
                 </div>
                 <div
                   class="transition-opacity"
@@ -447,6 +451,13 @@ function formatInterval(seconds: number): string {
   return parts.length ? parts.join(' ') : '0초'
 }
 
+function repeatCycleLabel(cycle?: string, daysOfWeek: number[] = []): string {
+  if (cycle === 'daily') return '매일'
+  if (cycle === 'weekdays') return '평일'
+  if (cycle === 'weekend') return '주말'
+  return '매주 ' + formatDaysOfWeek(daysOfWeek)
+}
+
 const router = useRouter()
 const messageStore = useMessageStore()
 const webhookStore = useWebhookStore()
@@ -474,7 +485,7 @@ const form = reactive({
   daysOfWeek: [] as number[],
   sendTime: '09:00',
   sendTimes: [] as string[],
-  repeatCycle: 'weekly' as 'daily' | 'weekly',
+  repeatCycle: 'weekly' as 'daily' | 'weekly' | 'weekdays' | 'weekend',
   sendOnce: false,
   useTimeRangeMode: false,
   timeRangeStart: '' as string,
@@ -492,9 +503,9 @@ const timeRangeValid = computed(() => {
 })
 
 function onRepeatCycleChange() {
-  if (form.repeatCycle === 'daily') {
-    form.daysOfWeek = [0, 1, 2, 3, 4, 5, 6]
-  }
+  if (form.repeatCycle === 'daily') form.daysOfWeek = [0, 1, 2, 3, 4, 5, 6]
+  else if (form.repeatCycle === 'weekdays') form.daysOfWeek = [1, 2, 3, 4, 5]
+  else if (form.repeatCycle === 'weekend') form.daysOfWeek = [0, 6]
 }
 
 const addSendTime = () => {
@@ -534,6 +545,8 @@ const editMessage = (message: Message) => {
   form.sendTimes = message.sendTimes?.length ? [...message.sendTimes] : []
   form.repeatCycle = message.repeatCycle || 'weekly'
   if (form.repeatCycle === 'daily') form.daysOfWeek = [0, 1, 2, 3, 4, 5, 6]
+  else if (form.repeatCycle === 'weekdays') form.daysOfWeek = [1, 2, 3, 4, 5]
+  else if (form.repeatCycle === 'weekend') form.daysOfWeek = [0, 6]
   form.sendOnce = message.sendOnce ?? false
   form.timeRangeStart = message.timeRangeStart ?? ''
   form.timeRangeEnd = message.timeRangeEnd ?? ''
@@ -557,7 +570,7 @@ const handleSubmit = async () => {
     const allTimes = useRange ? [] : (form.sendTimes.length ? form.sendTimes : [form.sendTime])
     const payload = {
       content: form.content,
-      daysOfWeek: form.repeatCycle === 'daily' ? [0, 1, 2, 3, 4, 5, 6] : form.daysOfWeek,
+      daysOfWeek: form.repeatCycle === 'daily' ? [0, 1, 2, 3, 4, 5, 6] : form.repeatCycle === 'weekdays' ? [1, 2, 3, 4, 5] : form.repeatCycle === 'weekend' ? [0, 6] : form.daysOfWeek,
       sendTime: useRange ? form.timeRangeStart : allTimes[0],
       sendTimes: allTimes,
       repeatCycle: form.repeatCycle,

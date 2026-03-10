@@ -5,7 +5,7 @@ export interface Message {
   daysOfWeek: number[]
   sendTime: string
   sendTimes?: string[]
-  repeatCycle?: 'daily' | 'weekly'
+  repeatCycle?: 'daily' | 'weekly' | 'weekdays' | 'weekend'
   sendOnce?: boolean
   timeRangeStart?: string
   timeRangeEnd?: string
@@ -21,7 +21,7 @@ export interface MessageCreate {
   daysOfWeek: number[]
   sendTime: string
   sendTimes?: string[]
-  repeatCycle?: 'daily' | 'weekly'
+  repeatCycle?: 'daily' | 'weekly' | 'weekdays' | 'weekend'
   sendOnce?: boolean
   timeRangeStart?: string
   timeRangeEnd?: string
@@ -35,7 +35,7 @@ export interface MessageUpdate {
   daysOfWeek?: number[]
   sendTime?: string
   sendTimes?: string[]
-  repeatCycle?: 'daily' | 'weekly'
+  repeatCycle?: 'daily' | 'weekly' | 'weekdays' | 'weekend'
   sendOnce?: boolean
   timeRangeStart?: string
   timeRangeEnd?: string

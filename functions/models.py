@@ -33,7 +33,7 @@ class MessageCreate(BaseModel):
     daysOfWeek: List[int] = Field(..., min_length=1, max_length=7)
     sendTime: str = Field(..., pattern=_TIME_PATTERN)
     sendTimes: Optional[List[str]] = None
-    repeatCycle: Optional[str] = Field(default="weekly", pattern=r'^(daily|weekly)$')
+    repeatCycle: Optional[str] = Field(default="weekly", pattern=r'^(daily|weekly|weekdays|weekend)$')
     sendOnce: bool = False
     timeRangeStart: Optional[str] = Field(None, pattern=_TIME_PATTERN)
     timeRangeEnd: Optional[str] = Field(None, pattern=_TIME_PATTERN)
@@ -47,7 +47,7 @@ class MessageUpdate(BaseModel):
     daysOfWeek: Optional[List[int]] = Field(None, min_length=1, max_length=7)
     sendTime: Optional[str] = Field(None, pattern=_TIME_PATTERN)
     sendTimes: Optional[List[str]] = Field(None, min_length=1, max_length=24)
-    repeatCycle: Optional[str] = Field(None, pattern=r'^(daily|weekly)$')
+    repeatCycle: Optional[str] = Field(None, pattern=r'^(daily|weekly|weekdays|weekend)$')
     sendOnce: Optional[bool] = None
     timeRangeStart: Optional[str] = Field(None, pattern=_TIME_PATTERN)
     timeRangeEnd: Optional[str] = Field(None, pattern=_TIME_PATTERN)

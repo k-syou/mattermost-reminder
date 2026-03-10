@@ -24,7 +24,7 @@ def _send_times_from_doc(doc_data: dict) -> List[str]:
 
 def _repeat_cycle_from_doc(doc_data: dict) -> str:
     r = doc_data.get("repeatCycle")
-    return r if r in ("daily", "weekly") else "weekly"
+    return r if r in ("daily", "weekly", "weekdays", "weekend") else "weekly"
 
 from dependencies import get_current_user
 from template_utils import render_message_template
