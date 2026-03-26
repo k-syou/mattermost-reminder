@@ -29,6 +29,35 @@ def get_db():
         _db = firestore.client()
     return _db
 
+def _build_send_key(sent_at: datetime, use_seconds: bool) -> str:
+    return sent_at.strftime("%Y%m%d%H%M%S" if use_seconds else "%Y%m%d%H%M")
+
+
+def _acquire_send_lock(db, message_id: str, send_key: str) -> bool:
+    doc_ref = db.collection("messages").document(message_id)
+
+    @firestore.transactional
+    def _txn(tx):
+        snap = doc_ref.get(transaction=tx)
+        data = snap.to_dict() or {}
+        if data.get("lastSentKey") == send_key:
+            return False
+        tx.update(
+            doc_ref,
+            {
+                "lastSentKey": send_key,
+                "lastSentAt": firestore.SERVER_TIMESTAMP,
+                "updatedAt": firestore.SERVER_TIMESTAMP,
+            },
+        )
+        return True
+
+    try:
+        return bool(_txn(db.transaction()))
+    except Exception as e:
+        logger.warning("Failed to acquire send lock for %s: %s", message_id, e)
+        return True
+
 
 def _write_send_log(db, message_id: str, user_id: str, status: str, sent_at, error: str = None, content_preview: str = None):
     try:
@@ -106,6 +135,7 @@ def send_scheduled_messages(event: scheduler_fn.ScheduledEvent) -> None:
                 "content": data.get("content", ""),
                 "webhookUrl": data.get("webhookUrl", ""),
                 "sendOnce": data.get("sendOnce", False),
+                "useSeconds": use_seconds,
             })
 
     logger.info("Active messages=%s, matched for send=%s", all_active, len(messages_to_send))
@@ -113,6 +143,11 @@ def send_scheduled_messages(event: scheduler_fn.ScheduledEvent) -> None:
     results = []
     for message in messages_to_send:
         sent_at = datetime.now(seoul_tz)
+        send_key = _build_send_key(sent_at, bool(message.get("useSeconds")))
+        if not _acquire_send_lock(db, message["id"], send_key):
+            logger.info("  skip duplicate messageId=%s sendKey=%s", message["id"], send_key)
+            results.append({"id": message["id"], "status": "skipped-duplicate", "sentAt": sent_at.isoformat()})
+            continue
         rendered_content = render_message_template(message["content"] or "", sent_at)
         content_preview = (rendered_content or "")[:200]
         try:
