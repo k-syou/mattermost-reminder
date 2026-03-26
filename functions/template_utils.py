@@ -1,6 +1,10 @@
+import logging
 import re
+import unicodedata
 from datetime import datetime, timezone
 from typing import Callable, Union
+
+_logger = logging.getLogger(__name__)
 
 # Support Firestore Timestamp or datetime as "now"
 def _normalize_dt(now: Union[datetime, None]) -> datetime:
@@ -13,17 +17,49 @@ def _normalize_dt(now: Union[datetime, None]) -> datetime:
     return datetime.now(timezone.utc)
 
 
+def _year4(dt: datetime) -> str:
+    return f"{dt.year:04d}"
+
+
+def _day2(dt: datetime) -> str:
+    return f"{dt.day:02d}"
+
+
 _TOKEN_RENDERERS: list[tuple[str, Callable[[datetime], str]]] = [
-    ("yyyy", lambda dt: f"{dt.year:04d}"),
+    # YYYY / DD: Java/SimpleDateFormat-style; must be before lowercase yyyy/dd
+    ("YYYY", _year4),
+    ("yyyy", _year4),
     ("MM", lambda dt: f"{dt.month:02d}"),
-    ("dd", lambda dt: f"{dt.day:02d}"),
+    ("DD", _day2),
+    ("dd", _day2),
     ("HH", lambda dt: f"{dt.hour:02d}"),
     ("mm", lambda dt: f"{dt.minute:02d}"),
+    ("ss", lambda dt: f"{dt.second:02d}"),
     ("M", lambda dt: f"{dt.month}"),
     ("d", lambda dt: f"{dt.day}"),
     ("H", lambda dt: f"{dt.hour}"),
     ("m", lambda dt: f"{dt.minute}"),
 ]
+
+
+_DASH_CHARS = (
+    "\u2010",
+    "\u2011",
+    "\u2012",
+    "\u2013",
+    "\u2014",
+    "\u2212",
+    "\uff0d",
+)
+
+
+def _normalize_placeholder_pattern(pat: str) -> str:
+    """NFKC, ASCII hyphen, collapse spaces — copy/paste from Word/PDF often breaks tokens."""
+    p = unicodedata.normalize("NFKC", pat or "")
+    for ch in _DASH_CHARS:
+        p = p.replace(ch, "-")
+    p = " ".join(p.split())
+    return p.strip()
 
 
 def format_dt_pattern(now: datetime, pattern: str) -> str:
@@ -88,9 +124,15 @@ def render_message_template(content: str, now: Union[datetime, None]) -> str:
         pat = pat.strip()
         if not pat:
             return raw
+        pat = _normalize_placeholder_pattern(pat)
+        if not pat:
+            return raw
         try:
             return format_dt_pattern(dt, pat)
-        except Exception:
+        except Exception as e:
+            # Likely date intent if pattern has format letters; else e.g. {foo} — only warn former
+            if any(c in pat for c in "yYmMdHhs"):
+                _logger.warning("template placeholder kept as-is: %r (%s)", raw, e)
             return raw
 
     return _BRACE_PATTERN.sub(_repl, content)

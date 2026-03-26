@@ -32,6 +32,16 @@ def test_render_message_template_fullwidth_braces():
     assert render_message_template(content, now) == "2026-03-09 16:05 ok"
 
 
+def test_render_message_template_java_style_yyyy():
+    now = datetime(2026, 3, 9, 16, 5, 0)
+    assert render_message_template("{YYYY-MM-dd HH:mm}", now) == "2026-03-09 16:05"
+
+
+def test_render_message_template_with_seconds():
+    now = datetime(2026, 3, 9, 16, 5, 42)
+    assert render_message_template("{yyyy-MM-dd HH:mm:ss}", now) == "2026-03-09 16:05:42"
+
+
 def test_format_dt_pattern_empty_raises():
     now = datetime(2026, 3, 9, 16, 5, 0)
     with pytest.raises(ValueError):
