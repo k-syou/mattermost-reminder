@@ -144,13 +144,13 @@ async def create_message(
             and time_range_end and str(time_range_end).strip()
             and interval_seconds is not None and interval_seconds >= 1
         )
+        send_times_to_store = [] if has_valid_range else list(send_times)
 
         message_data = {
             "userId": current_user["uid"],
             "content": message.content,
             "daysOfWeek": message.daysOfWeek,
             "sendTime": message.sendTime,
-            "sendTimes": send_times if not has_valid_range else [],
             "repeatCycle": repeat_cycle,
             "sendOnce": getattr(message, "sendOnce", False),
             "webhookUrl": str(message.webhookUrl),
@@ -158,6 +158,7 @@ async def create_message(
             "createdAt": firestore.SERVER_TIMESTAMP,
             "updatedAt": firestore.SERVER_TIMESTAMP
         }
+        message_data["sendTimes"] = send_times_to_store
         if has_valid_range:
             message_data["timeRangeStart"] = (time_range_start or "").strip()
             message_data["timeRangeEnd"] = (time_range_end or "").strip()
@@ -465,7 +466,7 @@ async def update_message(
         if message.sendTime is not None:
             update_data["sendTime"] = message.sendTime
         if message.sendTimes is not None:
-            update_data["sendTimes"] = message.sendTimes
+            update_data["sendTimes"] = list(message.sendTimes)
         if message.repeatCycle is not None:
             update_data["repeatCycle"] = message.repeatCycle
         if message.sendOnce is not None:

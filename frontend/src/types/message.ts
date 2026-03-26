@@ -1,14 +1,19 @@
+/** API 목록/조회 응답과 동일. 간격 반복 시 timeRangeStart, timeRangeEnd, intervalSeconds 포함 */
 export interface Message {
   id: string
   userId: string
   content: string
   daysOfWeek: number[]
   sendTime: string
+  /** 고정 시간 목록 (여러 개). 구간 반복 사용 시 빈 배열 */
   sendTimes?: string[]
   repeatCycle?: 'daily' | 'weekly' | 'weekdays' | 'weekend'
   sendOnce?: boolean
+  /** 구간 반복: 시작 시간 HH:mm */
   timeRangeStart?: string
+  /** 구간 반복: 종료 시간 HH:mm */
   timeRangeEnd?: string
+  /** 구간 반복: 간격(초). 1~86400 */
   intervalSeconds?: number
   webhookUrl: string
   isActive: boolean

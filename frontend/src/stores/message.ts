@@ -28,7 +28,7 @@ export const useMessageStore = defineStore('message', () => {
       })
 
       if (!response.ok) throw new Error('메시지 목록을 불러오는데 실패했습니다.')
-      messages.value = await response.json()
+      messages.value = (await response.json()) as Message[]
     } catch (err: any) {
       error.value = err.message
       throw err
@@ -66,7 +66,7 @@ export const useMessageStore = defineStore('message', () => {
       })
 
       if (!response.ok) throw new Error('메시지 생성에 실패했습니다.')
-      const newMessage = await response.json()
+      const newMessage = (await response.json()) as Message
       messages.value.push(newMessage)
       return newMessage
     } catch (err: any) {
@@ -105,7 +105,7 @@ export const useMessageStore = defineStore('message', () => {
       })
 
       if (!response.ok) throw new Error('메시지 수정에 실패했습니다.')
-      const updatedMessage = await response.json()
+      const updatedMessage = (await response.json()) as Message
       const index = messages.value.findIndex(m => m.id === id)
       if (index !== -1) {
         messages.value[index] = updatedMessage

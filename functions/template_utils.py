@@ -72,6 +72,8 @@ def render_message_template(content: str, now: Union[datetime, None]) -> str:
     if content is None:
         content = ""
     content = str(content)
+    # Fullwidth braces (common from IME / copy-paste) do not match \{...\}
+    content = content.replace("\uff5b", "{").replace("\uff5d", "}")
     if not content or "{" not in content:
         return content
 
@@ -80,6 +82,10 @@ def render_message_template(content: str, now: Union[datetime, None]) -> str:
     def _repl(match: re.Match) -> str:
         raw = match.group(0)
         pat = (match.group(1) or "").strip()
+        # Strip zero-width / format chars that break token matching or equality checks
+        for ch in ("\u200b", "\u200c", "\u200d", "\ufeff"):
+            pat = pat.replace(ch, "")
+        pat = pat.strip()
         if not pat:
             return raw
         try:

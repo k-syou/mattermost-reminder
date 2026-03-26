@@ -25,6 +25,13 @@ def test_render_message_template_invalid_kept():
     assert render_message_template(content, now) == content
 
 
+def test_render_message_template_fullwidth_braces():
+    """IME / copy-paste often uses U+FF5B/U+FF5D instead of ASCII { }."""
+    now = datetime(2026, 3, 9, 16, 5, 0)
+    content = "\uff5byyyy-MM-dd HH:mm\uff5d ok"
+    assert render_message_template(content, now) == "2026-03-09 16:05 ok"
+
+
 def test_format_dt_pattern_empty_raises():
     now = datetime(2026, 3, 9, 16, 5, 0)
     with pytest.raises(ValueError):

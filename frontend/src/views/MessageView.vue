@@ -599,12 +599,13 @@ const handleSubmit = async () => {
     }
     const intervalSeconds = (form.intervalHours || 0) * 3600 + (form.intervalMins || 0) * 60 + (form.intervalSecs || 0)
     const useRange = form.useTimeRangeMode && timeRangeValid.value
-    const allTimes = useRange ? [] : (form.sendTimes.length ? form.sendTimes : [form.sendTime])
+    const allTimes = useRange ? [] : (form.sendTimes?.length ? [...form.sendTimes] : [form.sendTime].filter(Boolean))
+    const sendTimesArr = Array.isArray(allTimes) ? allTimes : [form.sendTime].filter(Boolean)
     const payload = {
       content: form.content,
       daysOfWeek: form.repeatCycle === 'daily' ? [0, 1, 2, 3, 4, 5, 6] : form.repeatCycle === 'weekdays' ? [1, 2, 3, 4, 5] : form.repeatCycle === 'weekend' ? [0, 6] : form.daysOfWeek,
-      sendTime: useRange ? form.timeRangeStart : allTimes[0],
-      sendTimes: allTimes,
+      sendTime: useRange ? form.timeRangeStart : (sendTimesArr[0] || form.sendTime),
+      sendTimes: sendTimesArr,
       repeatCycle: form.repeatCycle,
       sendOnce: form.sendOnce,
       ...(useRange && {
