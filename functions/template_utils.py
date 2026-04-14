@@ -25,6 +25,27 @@ def _day2(dt: datetime) -> str:
     return f"{dt.day:02d}"
 
 
+# weekday(): Monday=0 … Sunday=6
+_KOREAN_WEEKDAY_SHORT = ("월", "화", "수", "목", "금", "토", "일")
+_KOREAN_WEEKDAY_LONG = (
+    "월요일",
+    "화요일",
+    "수요일",
+    "목요일",
+    "금요일",
+    "토요일",
+    "일요일",
+)
+
+
+def _korean_weekday_short(dt: datetime) -> str:
+    return _KOREAN_WEEKDAY_SHORT[dt.weekday()]
+
+
+def _korean_weekday_long(dt: datetime) -> str:
+    return _KOREAN_WEEKDAY_LONG[dt.weekday()]
+
+
 _TOKEN_RENDERERS: list[tuple[str, Callable[[datetime], str]]] = [
     # YYYY / DD: Java/SimpleDateFormat-style; must be before lowercase yyyy/dd
     ("YYYY", _year4),
@@ -35,6 +56,9 @@ _TOKEN_RENDERERS: list[tuple[str, Callable[[datetime], str]]] = [
     ("HH", lambda dt: f"{dt.hour:02d}"),
     ("mm", lambda dt: f"{dt.minute:02d}"),
     ("ss", lambda dt: f"{dt.second:02d}"),
+    # EE must be before E
+    ("EE", _korean_weekday_long),
+    ("E", _korean_weekday_short),
     ("M", lambda dt: f"{dt.month}"),
     ("d", lambda dt: f"{dt.day}"),
     ("H", lambda dt: f"{dt.hour}"),
@@ -67,6 +91,7 @@ def format_dt_pattern(now: datetime, pattern: str) -> str:
     Format datetime using a lightweight token format:
     - yyyy, MM, dd, HH, mm
     - M, d, H, m (no zero-padding)
+    - E (한글 요일 짧게: 월, 화, …), EE (한글 요일 길게: 월요일, 화요일, …)
     Example: "yyyy-MM-dd HH:mm" -> "2026-03-09 16:05", "M/d" -> "3/9".
     """
     p = (pattern or "").strip()
@@ -131,9 +156,10 @@ def render_message_template(content: str, now: Union[datetime, None]) -> str:
             return format_dt_pattern(dt, pat)
         except Exception as e:
             # Likely date intent if pattern has format letters; else e.g. {foo} — only warn former
-            if any(c in pat for c in "yYmMdHhs"):
+            if any(c in pat for c in "yYmMdHhsE"):
                 _logger.warning("template placeholder kept as-is: %r (%s)", raw, e)
             return raw
 
     return _BRACE_PATTERN.sub(_repl, content)
+
 

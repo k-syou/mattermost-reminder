@@ -10,6 +10,15 @@ def test_format_dt_pattern_basic():
     assert format_dt_pattern(now, "yyyy-MM-dd HH:mm") == "2026-03-09 16:05"
     assert format_dt_pattern(now, "M/d") == "3/9"
     assert format_dt_pattern(now, "MM/dd") == "03/09"
+    # 2026-03-09 is Monday
+    assert format_dt_pattern(now, "E") == "월"
+    assert format_dt_pattern(now, "EE") == "월요일"
+
+
+def test_format_dt_pattern_korean_weekday_sunday():
+    now = datetime(2026, 3, 8, 12, 0, 0)
+    assert format_dt_pattern(now, "E") == "일"
+    assert format_dt_pattern(now, "EE") == "일요일"
 
 
 def test_render_message_template_multiple_placeholders():
@@ -40,6 +49,12 @@ def test_render_message_template_java_style_yyyy():
 def test_render_message_template_with_seconds():
     now = datetime(2026, 3, 9, 16, 5, 42)
     assert render_message_template("{yyyy-MM-dd HH:mm:ss}", now) == "2026-03-09 16:05:42"
+
+
+def test_render_message_template_korean_weekday():
+    now = datetime(2026, 3, 9, 16, 5, 0)
+    assert render_message_template("{yyyy-MM-dd} ({E})", now) == "2026-03-09 (월)"
+    assert render_message_template("{EE}", now) == "월요일"
 
 
 def test_format_dt_pattern_empty_raises():

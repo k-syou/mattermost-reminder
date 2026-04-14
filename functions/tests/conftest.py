@@ -55,6 +55,13 @@ def mock_firestore_collection():
 @pytest.fixture(autouse=True)
 def mock_firestore_client():
     """Auto-mock Firestore client for all tests to prevent DefaultCredentialsError"""
+    # A third-party PyPI package named `routers` can shadow this repo's `routers` package.
+    _r = sys.modules.get("routers")
+    if _r is not None and not hasattr(_r, "webhooks"):
+        for key in list(sys.modules):
+            if key == "routers" or key.startswith("routers."):
+                del sys.modules[key]
+
     mock_db = Mock()
     mock_collection = Mock()
     mock_collection.stream.return_value = []
